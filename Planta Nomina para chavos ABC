@@ -1,0 +1,42 @@
+import pandas as pd
+
+fecha = '1 de julio'
+
+Planta_nomina = pd.read_excel(f'Planta nomina {fecha}.xlsx')
+
+# Filtrar filas donde la columna 'SDvPer.' termina con 'S'
+filtrado = Planta_nomina[Planta_nomina['SDvPer.'].astype(str).str.endswith('S')]
+
+# Eliminar filas donde 'Posición' es 99999999
+filtrado = filtrado[filtrado['Posición'] != 99999999]
+
+# Eliminar filas duplicadas según la columna 'Nº pers.'
+filtrado = filtrado.drop_duplicates(subset=['Nº pers.'])
+
+# Lista de columnas a eliminar
+columnas_a_borrar = [
+    'Gr.prof.',
+    'CC-nómina',
+    'Sueldo diario/mensual',
+    'Moneda',
+    'Clave ÁPers',
+    'Descripción Área de personal',
+    'Status',
+    'Status ocupación',
+    'Fecha antigüedad',
+    'Med.',
+    'Clase de medida',
+    'Desde',
+    'Cl.',
+    'Clase de convenio colectivo',
+    'Ár.',
+    'Área de convenio',
+    'GrPer',
+    'Grupo de personal',
+    'Motivo de la medida'
+]
+
+# Eliminar las columnas
+filtrado = filtrado.drop(columns=columnas_a_borrar, errors='ignore')
+filtrado.to_excel(f'Planta_Nomina SIX {fecha}.xlsx', index = False)
+print(filtrado)
