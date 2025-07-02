@@ -1,0 +1,64 @@
+import pandas as pd
+import time
+import pygame
+import os
+inicio = time.time()
+
+# Ruta del archivo
+ruta_tsv = r'C:\Users\dominh05\Documents\SIX\SA027\2025\SA027 - Base de Datos SIX - Cerveza Mayo 2025.xlsx'
+tiendas_conteo = pd.read_excel(ruta_tsv, sheet_name='Info', skiprows=7)
+
+# Filtrar el DataFrame basado en los valores de 'Status ', ignorando mayúsculas y minúsculas
+tiendas_conteo = tiendas_conteo[
+    tiendas_conteo['Status'].str.lower().isin(['activo', 'expansión', 'expansión mes', 'expansion', 'expansion mes'])
+]
+print(tiendas_conteo['Status'].unique())
+
+
+# Contar únicos de 'Ceco' por cada valor único en '# JOS (Resp)'
+count_jos = tiendas_conteo.groupby('# JOS (Resp)')['Ceco'].nunique().reset_index()
+count_jos.columns = ['Responsable', 'Ceco_Count']
+count_jos['Categoria'] = '# JOS (Resp)'
+
+# Contar únicos de 'Ceco' por cada valor único en '# ACS (Resp)'
+count_acs = tiendas_conteo.groupby('# ACS (Resp)')['Ceco'].nunique().reset_index()
+count_acs.columns = ['Responsable', 'Ceco_Count']
+count_acs['Categoria'] = '# ACS (Resp)'
+
+# Contar únicos de 'Ceco' por cada valor único en 'No. Empleado Atraccion'
+count_atraccion = tiendas_conteo.groupby('No. Empleado Atraccion')['Ceco'].nunique().reset_index()
+count_atraccion.columns = ['Responsable', 'Ceco_Count']
+count_atraccion['Categoria'] = 'No. Empleado Atraccion'
+
+# Concatenar resultados en una sola tabla verticalmente
+tabla_concatenada = pd.concat([count_jos, count_acs, count_atraccion], axis=0, ignore_index=True)
+
+# Agregar la columna 'Validación' que cuenta las apariciones de cada 'Responsable'
+tabla_concatenada['Validación'] = tabla_concatenada['Responsable'].map(tabla_concatenada['Responsable'].value_counts())
+tabla_concatenada.to_excel('Conteo de tiendas.xlsx', index=False)
+
+# Mostrar el resultado
+print(tabla_concatenada)
+fin = time.time() - inicio
+fin = fin / 60
+print(f'Resultado tomó {fin} minutos.')
+print('Proceso terminado exitosamente')
+pygame.init()
+
+# Ruta del archivo de audio
+audio_file = r'C:\Users\dominh05\Documents\My project (37).wav'
+
+# Verificar si el archivo existe
+if not os.path.exists(audio_file):
+    print(f"El archivo '{audio_file}' no existe.")
+else:
+    # Reproducir el archivo de audio
+    pygame.mixer.music.load(audio_file)
+    pygame.mixer.music.play()
+
+    # Esperar hasta que la música termine de reproducirse
+    while pygame.mixer.music.get_busy():
+        pygame.time.Clock().tick(10)
+
+# Terminar pygame
+pygame.quit()
