@@ -19,13 +19,20 @@ import pandas as pd
 # com2021_sin_sindirectas.to_parquet('Final_de_comisiones_2021.parquet',index=False)
 
 # op = pd.read_excel(r'C:\Users\dominh05\Documents\SIX\OP acumulado 2022 a 2025.xlsx', sheet_name='OP Acumulado')
+# # ...existing code...
 
+# # Asegúrate de que 'Fecha' sea tipo datetime
+# op['Fecha'] = pd.to_datetime(op['Fecha'], errors='coerce')
+
+# # Multiplica EBIT por -1 solo donde Fecha >= 2024-01-01
+# op.loc[op['Fecha'] >= pd.Timestamp('2024-01-01'), 'EBIT'] *= -1
+
+# # ...existing code...
 # # Reemplaza "-" por NaN
 # op['Mes Exp'] = op['Mes Exp'].replace("-", pd.NA)
 # op['Precio (Hlt)'] = op['Precio (Hlt)'].replace("-", pd.NA)
 
-# # Convierte a numérico (int o float)
-# op['Mes Exp'] = pd.to_numeric(op['Mes Exp'], errors='coerce')
+# op['Mes Exp'] = pd.to_datetime(op['Mes Exp'], errors='coerce')
 # # string
 # op['CECO'] = op['CECO'].astype(str)
 # op['GZ'] = op['GZ'].astype(str)
@@ -71,8 +78,15 @@ import pandas as pd
 # for col in columnas_numericas:
 #     op[col] = pd.to_numeric(op[col], errors='coerce')
 
+
+# # ...existing code...
+
+# # Convierte la columna 'Año' a texto concatenando 'ay' al final
+ 
+# op['Llave'] = op['CECO'].astype(str) + op['MES PL'].astype(str) + op['Año'].astype(str)
 # op.to_parquet('OP_Historico.parquet', index=False)
-# ...existing code...
+# #op.to_excel('OP_Historico.xlsx', index=False)
+
 
 
 # com2023_normal = pd.read_excel('Final_de_comisiones_2023.xlsx')
@@ -94,34 +108,34 @@ import pandas as pd
 
 # com2023_normal.to_parquet('Final_de_comisiones_2023.parquet',index=False)
 
-com2022_normal = pd.read_excel('Final_de_comisiones_2022v.xlsx')
-com2022_normal['No.SAPDENEGOCIO'] = com2022_normal['No.SAPDENEGOCIO'].astype(str)
-com2022_normal['CONCEPTO APOYO (VARIOS)'] = com2022_normal['CONCEPTO APOYO (VARIOS)'].astype(str)
-com2022_normal['AJUSTE DE COMISIONES ANTERIORES'] = com2022_normal['AJUSTE DE COMISIONES ANTERIORES'].astype(str)
-com2022_normal['PROPUESTA DE PAGO'] = com2022_normal['PROPUESTA DE PAGO'].astype(str)
-com2022_normal['DIF'] = com2022_normal['DIF'].astype(str)
-com2022_normal['BP+BR'] = com2022_normal['BP+BR'].astype(str)
-com2022_normal['Solicitante'] = com2022_normal['Solicitante'].astype(str)
-com2022_normal['Motivo'] = com2022_normal['Motivo'].astype(str)
-com2022_normal['Fecha'] = com2022_normal['Fecha'].astype(str)
-com2022_normal['Comentario'] = com2022_normal['Comentario'].astype(str)
-com2022_normal['Percepción Com DIC C1'] = com2022_normal['Percepción Com DIC C1'].astype(str)
-com2022_normal['MONTO A GARANTIZAR (PERCEPCION - MONTO A GARANTIZAR)'] = com2022_normal['MONTO A GARANTIZAR (PERCEPCION - MONTO A GARANTIZAR)'].astype(str)
-com2022_normal['COMENTARIO.1'] = com2022_normal['COMENTARIO.1'].astype(str)
-com2022_normal['REGION.1'] = com2022_normal['REGION.1'].astype(str)
-com2022_normal['RESICO.1'] = com2022_normal['RESICO.1'].astype(str)
-com2022_normal['RETENCIÓN'] = com2022_normal['RETENCIÓN'].astype(str)
-com2022_normal['Percepción Com DIC C1'] = com2022_normal['Percepción Com DIC C1'].astype(str)
-com2022_normal['MONTO A GARANTIZAR (PERCEPCION - MONTO A GARANTIZAR)'] = com2022_normal['MONTO A GARANTIZAR (PERCEPCION - MONTO A GARANTIZAR)'].astype(str)
-com2022_normal['COMENTARIO.1'] = com2022_normal['COMENTARIO.1'].astype(str)
-com2022_normal['REGION.1'] = com2022_normal['REGION.1'].astype(str)
-com2022_normal['FALTANTE'] = com2022_normal['FALTANTE'].astype(str)
-com2022_normal['RESICO.1'] = com2022_normal['RESICO.1'].astype(str)
-com2022_normal['FECHA'] = pd.to_datetime(com2022_normal['FECHA'], errors='coerce')
+# com2022_normal = pd.read_excel('Final_de_comisiones_2022v.xlsx')
+# com2022_normal['No.SAPDENEGOCIO'] = com2022_normal['No.SAPDENEGOCIO'].astype(str)
+# com2022_normal['CONCEPTO APOYO (VARIOS)'] = com2022_normal['CONCEPTO APOYO (VARIOS)'].astype(str)
+# com2022_normal['AJUSTE DE COMISIONES ANTERIORES'] = com2022_normal['AJUSTE DE COMISIONES ANTERIORES'].astype(str)
+# com2022_normal['PROPUESTA DE PAGO'] = com2022_normal['PROPUESTA DE PAGO'].astype(str)
+# com2022_normal['DIF'] = com2022_normal['DIF'].astype(str)
+# com2022_normal['BP+BR'] = com2022_normal['BP+BR'].astype(str)
+# com2022_normal['Solicitante'] = com2022_normal['Solicitante'].astype(str)
+# com2022_normal['Motivo'] = com2022_normal['Motivo'].astype(str)
+# com2022_normal['Fecha'] = com2022_normal['Fecha'].astype(str)
+# com2022_normal['Comentario'] = com2022_normal['Comentario'].astype(str)
+# com2022_normal['Percepción Com DIC C1'] = com2022_normal['Percepción Com DIC C1'].astype(str)
+# com2022_normal['MONTO A GARANTIZAR (PERCEPCION - MONTO A GARANTIZAR)'] = com2022_normal['MONTO A GARANTIZAR (PERCEPCION - MONTO A GARANTIZAR)'].astype(str)
+# com2022_normal['COMENTARIO.1'] = com2022_normal['COMENTARIO.1'].astype(str)
+# com2022_normal['REGION.1'] = com2022_normal['REGION.1'].astype(str)
+# com2022_normal['RESICO.1'] = com2022_normal['RESICO.1'].astype(str)
+# com2022_normal['RETENCIÓN'] = com2022_normal['RETENCIÓN'].astype(str)
+# com2022_normal['Percepción Com DIC C1'] = com2022_normal['Percepción Com DIC C1'].astype(str)
+# com2022_normal['MONTO A GARANTIZAR (PERCEPCION - MONTO A GARANTIZAR)'] = com2022_normal['MONTO A GARANTIZAR (PERCEPCION - MONTO A GARANTIZAR)'].astype(str)
+# com2022_normal['COMENTARIO.1'] = com2022_normal['COMENTARIO.1'].astype(str)
+# com2022_normal['REGION.1'] = com2022_normal['REGION.1'].astype(str)
+# com2022_normal['FALTANTE'] = com2022_normal['FALTANTE'].astype(str)
+# com2022_normal['RESICO.1'] = com2022_normal['RESICO.1'].astype(str)
+# com2022_normal['FECHA'] = pd.to_datetime(com2022_normal['FECHA'], errors='coerce')
 
 
 
-com2022_normal.to_parquet('Final_de_comisiones_2022.parquet',index=False)
+# com2022_normal.to_parquet('Final_de_comisiones_2022.parquet',index=False)
 
 # print('listo el primero rey')
 # com2024_normal = pd.read_excel('Final_de_comisiones_2024.xlsx')
@@ -143,24 +157,24 @@ com2022_normal.to_parquet('Final_de_comisiones_2022.parquet',index=False)
 # com2024_normal['FECHA'] = pd.to_datetime(com2024_normal['FECHA'], errors='coerce')
 
 # com2024_normal.to_parquet('Final_de_comisiones_2024.parquet',index=False)
-# print('listo 2024  rey')
-# com2025_normal = pd.read_excel('Final_de_comisiones_2025.xlsx')
-# com2025_normal['No.SAPDENEGOCIO'] = com2025_normal['No.SAPDENEGOCIO'].astype(str)
-# com2025_normal['CONCEPTO APOYO (VARIOS)'] = com2025_normal['CONCEPTO APOYO (VARIOS)'].astype(str)
-# com2025_normal['AJUSTE DE COMISIONES ANTERIORES'] = com2025_normal['AJUSTE DE COMISIONES ANTERIORES'].astype(str)
-# com2025_normal['PROPUESTA DE PAGO'] = com2025_normal['PROPUESTA DE PAGO'].astype(str)
-# com2025_normal['DIF'] = com2025_normal['DIF'].astype(str)
-# com2025_normal['BP+BR'] = com2025_normal['BP+BR'].astype(str)
-# com2025_normal['Solicitante'] = com2025_normal['Solicitante'].astype(str)
-# com2025_normal['Motivo'] = com2025_normal['Motivo'].astype(str)
-# com2025_normal['Fecha'] = com2025_normal['Fecha'].astype(str)
-# com2025_normal['Comentario'] = com2025_normal['Comentario'].astype(str)
-# com2025_normal['RETENCIÓN'] = com2025_normal['RETENCIÓN'].astype(str)
-# com2025_normal['Percepción Com DIC C1'] = com2025_normal['Percepción Com DIC C1'].astype(str)
-# com2025_normal['MONTO A GARANTIZAR (PERCEPCION - MONTO A GARANTIZAR)'] = com2025_normal['MONTO A GARANTIZAR (PERCEPCION - MONTO A GARANTIZAR)'].astype(str)
-# com2025_normal['COMENTARIO.1'] = com2025_normal['COMENTARIO.1'].astype(str)
-# com2025_normal['REGION.1'] = com2025_normal['REGION.1'].astype(str)
-# com2025_normal['RESICO.1'] = com2025_normal['RESICO.1'].astype(str)
-# com2025_normal['FECHA'] = pd.to_datetime(com2025_normal['FECHA'], errors='coerce')
+# # print('listo 2024  rey')
+com2025_normal = pd.read_excel('Final_de_comisiones_2025.xlsx')
+com2025_normal['No.SAPDENEGOCIO'] = com2025_normal['No.SAPDENEGOCIO'].astype(str)
+com2025_normal['CONCEPTO APOYO (VARIOS)'] = com2025_normal['CONCEPTO APOYO (VARIOS)'].astype(str)
+com2025_normal['AJUSTE DE COMISIONES ANTERIORES'] = com2025_normal['AJUSTE DE COMISIONES ANTERIORES'].astype(str)
+com2025_normal['PROPUESTA DE PAGO'] = com2025_normal['PROPUESTA DE PAGO'].astype(str)
+com2025_normal['DIF'] = com2025_normal['DIF'].astype(str)
+com2025_normal['BP+BR'] = com2025_normal['BP+BR'].astype(str)
+com2025_normal['Solicitante'] = com2025_normal['Solicitante'].astype(str)
+com2025_normal['Motivo'] = com2025_normal['Motivo'].astype(str)
+com2025_normal['Fecha'] = com2025_normal['Fecha'].astype(str)
+com2025_normal['Comentario'] = com2025_normal['Comentario'].astype(str)
+com2025_normal['RETENCIÓN'] = com2025_normal['RETENCIÓN'].astype(str)
+com2025_normal['Percepción Com DIC C1'] = com2025_normal['Percepción Com DIC C1'].astype(str)
+com2025_normal['MONTO A GARANTIZAR (PERCEPCION - MONTO A GARANTIZAR)'] = com2025_normal['MONTO A GARANTIZAR (PERCEPCION - MONTO A GARANTIZAR)'].astype(str)
+com2025_normal['COMENTARIO.1'] = com2025_normal['COMENTARIO.1'].astype(str)
+com2025_normal['REGION.1'] = com2025_normal['REGION.1'].astype(str)
+com2025_normal['RESICO.1'] = com2025_normal['RESICO.1'].astype(str)
+com2025_normal['FECHA'] = pd.to_datetime(com2025_normal['FECHA'], errors='coerce')
 
-# com2025_normal.to_parquet('Final_de_comisiones_2025.parquet', index=False)
+com2025_normal.to_parquet('Final_de_comisiones_2025.parquet', index=False)
