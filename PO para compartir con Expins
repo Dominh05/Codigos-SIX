@@ -1,0 +1,19 @@
+import pandas as pd
+
+#Archivos 
+PO = r'C:\Users\dominh05\Documents\PO\PO 2025\07. PO Julio 2025.xlsx'
+
+#Leer archivo
+df = pd.read_excel(PO)
+columnas = df.columns.tolist()
+
+#Copia del DataFrame
+df_copia = df.copy()
+
+#Columnas a eliminar 
+borrar_a_borrar = ['Gender', 'Date of Birth', 'Nationality', 'State of Birth', 'Place of Birth', 'Local Job Grade', 'Job Grade',	'Employment Details Hire Date',	'Position Assignment Date', 'Employee Class', 'Cost Centre Cost Center', 'Cost Centre Cost Center Name', 'Employee Group',	'Employee Subgroup']
+ 
+df_copia = df_copia.drop(columns=borrar_a_borrar, errors='ignore')
+
+#Exportar copia a excel
+df_copia.to_excel('PO_SIX.xlsx', index=False)
