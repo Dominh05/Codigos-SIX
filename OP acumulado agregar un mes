@@ -1,0 +1,92 @@
+import pandas as pd
+
+# Crear la variable de fecha como datetime
+fecha_nuevo_mes = pd.to_datetime("01/07/2025", dayfirst=True)
+
+op_historico = pd.read_parquet(r"C:\Users\dominh05\Documents\SIX\Codigos_six\Comisiones\Bases Fregonas\OP_Historico.parquet")
+print(op_historico['Fecha'].unique())
+# Multiplica por -1 donde el año sea 2024 o 2025
+#op_historico.loc[op_historico['Fecha'].dt.year.isin([2024, 2025]), 'EBIT'] *= -1
+# ...existing code...
+
+# Crear tabla pivote con 'Fecha' como índice y 'EBIT' como valores# Agrupa por año en la columna 'Fecha'
+op_historico['Año'] = op_historico['Fecha'].dt.year
+op_historico['Mes'] = op_historico['Fecha'].dt.month
+
+# Crea la tabla pivote
+pivot_ebit = op_historico.pivot_table(
+    index=['Año', 'Mes'],
+    values='EBIT',
+    aggfunc='sum'
+).reset_index()
+
+# Exporta a Excel
+print(pivot_ebit.head(30))
+
+nuevo_mes = pd.read_excel(r"C:\Users\dominh05\Downloads\REP_09 - P&L por Tienda JUL 2025.xlsx")
+
+# Renombrar columnas en nuevo_mes para que coincidan con op_historico
+nuevo_mes = nuevo_mes.rename(columns={
+    'Licences & Permits': 'Licencias y Refrendos',
+    'Ingreso por Venta de Envase2': 'Ingreso por Venta de Envase'
+})
+
+# Asignarla como nueva columna al DataFrame
+nuevo_mes['Fecha'] = fecha_nuevo_mes
+
+# 3. Crear columnas Mes y Año
+nuevo_mes['MES PL'] = nuevo_mes['Fecha'].dt.month
+nuevo_mes['Año'] = nuevo_mes['Fecha'].dt.year
+nuevo_mes['Mes'] = nuevo_mes['MES PL']
+# 4. Crear columna MES OP (mes anterior, con rollover de enero a diciembre)
+nuevo_mes['MES COM OP'] = nuevo_mes['MES PL'].apply(lambda x: 12 if x == 1 else x - 1)
+nuevo_mes['Llave'] = (
+    nuevo_mes['CECO'].astype(str) + 
+    nuevo_mes['MES PL'].astype(str) + 
+    nuevo_mes['Año'].astype(str)
+)
+
+
+# Concatenar ambos DataFrames (uno debajo del otro)
+df_concat = pd.concat([op_historico, nuevo_mes], ignore_index=True)
+
+# Asegúrate de que 'fecha' sea datetime
+df_concat['Fecha'] = pd.to_datetime(df_concat['Fecha'], errors='coerce')
+
+# Validar diferencias de columnas
+cols_historico = set(op_historico.columns)
+cols_nuevo = set(nuevo_mes.columns)
+
+solo_en_historico = cols_historico - cols_nuevo
+solo_en_nuevo = cols_nuevo - cols_historico
+
+print("Columnas solo en OP_Historico:", solo_en_historico)
+print("Columnas solo en nuevo_mes:", solo_en_nuevo)
+df_concat['CECO'] = df_concat['CECO'].astype(str)
+
+df_concat['Fecha'] = pd.to_datetime(df_concat['Fecha'], errors='coerce')
+
+# ...existing code...
+# Reemplaza "-" por NaN
+df_concat['Mes Exp'] = df_concat['Mes Exp'].replace("-", pd.NA)
+df_concat['Precio (Hlt)'] = df_concat['Precio (Hlt)'].replace("-", pd.NA)
+
+df_concat['Mes Exp'] = pd.to_datetime(df_concat['Mes Exp'], errors='coerce')
+# string
+df_concat['CECO'] = df_concat['CECO'].astype(str)
+df_concat['GZ'] = df_concat['GZ'].astype(str)
+df_concat['JOS'] = df_concat['JOS'].astype(str)
+df_concat['Llave'] = df_concat['Llave'].astype(str)
+
+print(df_concat['Fecha'].unique())
+#df_concat.head(40).to_excel('OP_Historico jul 2025.xlsx')
+df_concat.to_parquet('OP_Historico jul 2025.parquet')
+
+
+# Crea la tabla pivote
+pivot_ebit = df_concat.pivot_table(
+    index=['Año', 'Mes'],
+    values='EBIT',
+    aggfunc='sum'
+).reset_index()
+print(pivot_ebit)
