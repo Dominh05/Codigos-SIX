@@ -1,6 +1,3 @@
-# %% [markdown]
-# # Actualización del final de comisiones
-
 # %%
 import pandas as pd
 import time
@@ -46,7 +43,6 @@ diccionario_porcentaje_HSK = dict(zip(
     porcentaje_de_hsk['CV HSK']
 ))
 
-
 estatus_dict = {
     'ACTIVOS': 'ACTIVOS',
     'BAJAS': 'BAJAS',
@@ -78,17 +74,11 @@ base_comisiones['Cumple_Condiciones_Tienda_Activa'] = (
 #     (base_comisiones['SIX'] != 'INDIRECTO') & 
 #     (base_comisiones['OCUPACIÓN'] == 'TOTAL') & 
 #     (base_comisiones['DIAS LABORADOS'] >= 26)
-# ].copy()
- 
-# Paso 1: Crear la columna 'Conteo acumulado mes'
-base_comisiones['Conteo acumulado mes'] = base_comisiones.groupby(['No.SAPDENEGOCIO','NoDEPROVEEDOR']).cumcount() + 1
-# Paso 2: Crear la columna 'MOPS' con el valor máximo de 'Conteo acumulado mes' para cada 'No.SAPDENEGOCIO'
-base_comisiones['Meses_YTD'] = base_comisiones.groupby(['No.SAPDENEGOCIO','NoDEPROVEEDOR'])['Conteo acumulado mes'].transform('max')
+# ].copy()  
 
 tabla_hectolitraje = pd.read_excel(ruta_tabla_htl)
 
 base_comisiones['Total Income sin subsidio'] = base_comisiones['Total Income']-base_comisiones['GARANTIAS (G)'] 
-
 merged_df = base_comisiones
 
 merged_df['HTL'] = merged_df['HTL'].fillna(0)
@@ -105,9 +95,7 @@ labels = ['0 a 1', '>1 a 1.5', '>1.5 a 3', '>3 a 5', '>5 a 6', '>6 a 8', '>8 a 1
 
 
 # Crear la nueva columna 'Grupo HTL' con los rangos correspondientes
-merged_df['Grupo_HTL_Mes'] = pd.cut(merged_df['HTL'], bins=bins, labels=labels, right=False)
-
-
+merged_df['Grupo_HTL'] = pd.cut(merged_df['HTL'], bins=bins, labels=labels, right=False)
 
 # Crear la columna condicional
 merged_df['Flag_Total_Income < 15000'] = merged_df['Total Income sin subsidio'].apply(lambda x: 1 if x < 15000 else 0)
@@ -178,10 +166,11 @@ merged_df['Ayudas_y_bonos_Mes'] = merged_df[columnas_ayudas_y_bonos].sum(axis=1)
 merged_df['Territorio_Tipo'] = merged_df['REGION'].apply(lambda x: 'Stronghold' if x in ['NORESTE', 'NOROESTE', 'SURESTE'] else 'Challenger')
 
 merged_df['Com_Cerveza_De_Contrato'] = merged_df['No.SAPDENEGOCIO'].map(diccionario_porcentaje_contrato)
-
 merged_df['Porcentaje_de_hsk'] = merged_df['No.SAPDENEGOCIO'].map(diccionario_porcentaje_HSK)
 merged_df['Com_Cerveza_de_hsk'] = merged_df['Porcentaje_de_hsk'] * merged_df['VENTA CERVEZA'] 
-merged_df['Beneficio_HSK'] = merged_df['Com_Cerveza_de_hsk'] - merged_df['COMISIÓN CERVEZA']
+
+merged_df['Beneficio_HSK'] = merged_df['Com_Cerveza_de_hsk'] - (merged_df['Com_Cerveza_De_Contrato'] * merged_df['VENTA CERVEZA'])
+
 merged_df['Cumplimiento_Comision_Contrato'] = merged_df['% COMISIÓN CERVEZA'] >= merged_df['Com_Cerveza_De_Contrato']
 
 
@@ -213,85 +202,6 @@ merged_df['Sell_out_Region_Mes'] = merged_df['Llave_Sell_out'].map(diccionario_d
 # Eliminar las columnas auxiliares de llave
 merged_df.drop(columns=["Llave_OP", "Llave_Revenue", "Llave_Sell_out"], inplace=True)
 
-#creo que este pez no va a jalar, mejor tomar este tipo de datos del pnl
-#op sobre htl
-#merged_df['OP_por_HTL'] = merged_df['OP_Region_Mes'] /merged_df['Sell_out_Region_Mes'] * merged_df['HTL']
-#merged_df['GI/OP Margin'] = merged_df['OP_Region_Mes'] /merged_df['Revenue_Region_Mes']
-
-#aca si tira error es porque le cambie Mes a Mes
-def asignar_quarter(mes):
-    if mes in [1, 2, 3]:
-        return 'Q1'
-    elif mes in [4, 5, 6]:
-        return 'Q2'
-    elif mes in [7, 8, 9]:
-        return 'Q3'
-    elif mes in [10, 11, 12]:
-        return 'Q4'
-    else:
-        return 'Mes inválido'
-merged_df['Quarter'] = merged_df['Mes'].apply(asignar_quarter)
-merged_df['Quarter_Year'] = merged_df['Quarter'] + merged_df['Año_Comision'].astype(str)
-
-def asignar_semester(mes):
-    if mes in [1, 2, 3, 4, 5, 6]:
-        return 'S1'
-    elif mes in [7, 8, 9,10, 11, 12]:
-        return 'S2'
-    else:
-        return 'Mes inválido'
-    
-
-merged_df['Semester'] = merged_df['Mes'].apply(asignar_semester)
-merged_df['Semester_Year'] = merged_df['Semester'] + merged_df['Año_Comision'].astype(str)
-
-
-orden_columnas = [
-    "REGION", "ZONA", "PLAZA", "No.SAPDENEGOCIO", "NOMBRE DEL NEGOCIO", "NoDEPROVEEDOR", 
-    "NOMBRE DEL COMERCIANTE", "STATUS", "MODALIDAD", "TABULADOR", "SIX", "OCUPACIÓN", 
-    "FECHA", "DIA", "MES", "AÑO", "DIAS LABORADOS", "VENTA CERVEZA", "% COMISIÓN CERVEZA", 
-    "MONTO GARANTIZADO", "COMISIÓN CERVEZA", "COMPLEMENTO DE COMISION FIJA/VARIABLE", 
-    "CIGARROS", "TAE", "PAGO RTD'S", "STRONGBOW", "SPIRITS", "ENERGIZANTES (BOOST)", 
-    "SUEROS ORALES", "SIM CARDS", "ENCENDEDORES", "CANIJILLA", "ARTICULOS SIX", 
-    "FARMACIA G", "FARMACIA M", "AGUA", "ENERGY DRINKS", "SERVICIOS ELECTRONICOS", "URBANI y VA y VEN",
-    "INCENTIVO CATEGORIAS DIRECTAS", "INCENTIVO CATEGORIAS INDIRECTAS", 
-    "REDENCIONES LÁCTEOS", "REDENCIONES REFRESCOS", "REDENCIONES SNACK", 
-    "REDENCIONES HELADOS", "REDENCIONES CIGARROS", "BONO DE BIENVENIDA", "BONO CERVEZA", 
-    "BONO EJECUCIÓN", "INSTRUCTOR INDIRECTO", "APOYO TEMPORAL COMODIN", "INSTRUCTOR", 
-    "GARANTIAS (G)", "CIERRE TEMPORAL", "GENTE COMO TU", "INCENTIVO USO POS", 
-    "INCENTIVO GLUP", "APOYOS (VARIOS)", "CONCEPTO APOYO (VARIOS)", "ANTICIPOS", 
-    "PERCEPCION", "IVA", "INGRESO BRUTO", "IVA RET", "IMPUESTOS FEDERALES", 
-    "HONORARIOS CONTADOR", "IMSS", "TIMBRADO", "RESICO", "AJUSTE DE COMISIÓN", 
-    "GARANTÍA CONTABLE", "MULTAS", "DESCUENTO ENE ELEC", "PENALIZACIONES", "HIELO", 
-    "PRODUCTOS COMPLEMENTARIOS", "PENSIÓN ALIMENTICIA", "GARANTÍA", "ANTICIPO", 
-    "GASTOS FIJOS", "KIT DE SEGURIDAD", "USO POS", "MULTA NO VENTA A MENORES", 
-    "HIPOTECARIO", "AJUSTE DE COMISIONES ANTERIORES", "TOTAL DESCUENTOS", "PAGO ", 
-    "PROPUESTA DE PAGO", "DIF", "COMENTARIO", "FALTANTE", "BP+BR", "RETENCIÓN", 
-    "Solicitante", "Motivo", "Fecha", "Comentario", "Percepción Com DIC C1", 
-    "MONTO A GARANTIZAR (PERCEPCION - MONTO A GARANTIZAR)", "COMENTARIO.1", 
-    "MONTO GARANTIZADO.1", "Apoyo Anticipo", "ACLARACIONES", 
-    "COMPLEMENTO DE COMISION FIJA/VARIABLE.1", "Otros", "Total", "REGION.1", "RESICO.1", "Codigo_registro",
-    #nuevas columnas
-    "MES ARCH","Año_Comision", "Fecha_de_comisión","Quarter_Year", "Semester_Year","REGION CORTA", "Revenue", 
-    "HSK", "Garantizado", "Territorio_Tipo","Cumple_Condiciones_Tienda_Activa","Com_Cerveza_De_Contrato", "Cumplimiento_Comision_Contrato","Porcentaje_de_hsk",
-    #meses
-    "Mes", "Conteo acumulado mes", "Meses_YTD", 
-    #datos financieros
-    "OP_Region_Mes", "Revenue_Region_Mes", "Sell_out_Region_Mes",
-    #htl
-    "HTL","Grupo_HTL_Mes", 
-    #comisionesim
-    "Indirectas", "Total Income",
-    #desgloce montos
-    "OC_Directas_Mes","GEC_Mes","Redenciones_Mes", "Ayudas_y_bonos_Mes",    
-    #income
-    "Total Income sin subsidio",
-    #subsidio
-    "Flag_Total_Income < 15000"
-]
-
-merged_df = merged_df[orden_columnas]
-
 # el ultimo porcentaje de cerveza usado
 lookup_dict = merged_df.drop_duplicates(subset='No.SAPDENEGOCIO', keep='last') \
                          .set_index('No.SAPDENEGOCIO')['% COMISIÓN CERVEZA'].to_dict()
@@ -311,19 +221,6 @@ choices = ['Territorio A', 'Territorio B', 'Territorio C']
 
 # Asignar territorios a los registros
 merged_df['Territorio'] = np.select(conditions, choices, default="nan")
-
-merged_df['Espejo % COM CERVEZA ULTIMO MES'] = merged_df['% COM CERVEZA ULTIMO MES']  
-
-merged_df['Comisión_Cerveza con % COM CERVEZA ULTIMO MES'] = merged_df['VENTA CERVEZA'] * merged_df['Espejo % COM CERVEZA ULTIMO MES']
-
-merged_df['Nuevo_Total_Income con % COM CERVEZA ULTIMO MES'] = (
-        merged_df['Comisión_Cerveza con % COM CERVEZA ULTIMO MES']
-        + merged_df['OC_Directas_Mes']
-        + merged_df['GEC_Mes']
-        + merged_df['Redenciones_Mes']
-        + merged_df['Ayudas_y_bonos_Mes']
-        + merged_df['Indirectas']
-    )
 
 ###############################################################################################################
 
@@ -369,37 +266,6 @@ def agregar_metricas_outliers(df):
 # Aplicar la función de agregación de métricas
 merged_df = agregar_metricas_outliers(merged_df)
 merged_df['CV'] = merged_df['CV'].fillna(0)
-########################################################################
-
-
-def promedio_12m_por_tienda(df):
-    df = df.sort_values('Fecha_de_comisión')
-    resultados = []
-
-    for i, row in df.iterrows():
-        fecha_limite = row['Fecha_de_comisión'] - pd.DateOffset(months=12)
-        filtro = (df['Fecha_de_comisión'] > fecha_limite) & (df['Fecha_de_comisión'] <= row['Fecha_de_comisión'])
-        promedio = df.loc[filtro, 'HTL'].mean()
-        resultados.append(promedio)
-
-    df['HTL_Promedio_12MOPS'] = resultados
-    return df
-
-# Aplicar por tienda
-merged_df = merged_df.groupby('No.SAPDENEGOCIO', group_keys=False).apply(promedio_12m_por_tienda)
-
-# Definir los límites de los rangos para HTL
-bins = [0, 1.00000001, 1.50000001, 3.00000001, 5.00000001, 6.00000001, 8.00000001, 10.00000001, 
-        11.00000001, 15.00000001, 20.00000001, 25.00000001, 30.00000001, 40.00000001, 
-        60.00000001, 80.00000001, 100.00000001, float('inf')]
-
-# Etiquetas  para cada rango
-labels = ['0 a 1', '>1 a 1.5', '>1.5 a 3', '>3 a 5', '>5 a 6', '>6 a 8', '>8 a 10', 
-          '>10 a 11', '>11 a 15', '>15 a 20', '>20 a 25', '>25 a 30', '>30 a 40', 
-          '>40 a 60', '>60 a 80', '>80 a 100', '>100']
-
-# Crear la nueva columna 'Grupo HTL' con los rangos correspondientes
-merged_df['Grupo_HTL_12MOPS'] = pd.cut(merged_df['HTL_Promedio_12MOPS'], bins=bins, labels=labels, right=False)
 
 #normaliza y quita decimales de la tabla de % de cerveza - hL
 
@@ -419,72 +285,37 @@ percentage_cv_prop_c = tabla_hectolitraje['% CV PROP C'].unique().tolist()
 # Redondear cada valor de la lista a 3 decimales
 percentage_cv_prop_c = [round(value, 3) for value in percentage_cv_prop_c]
 
-def find_cv_percentage(htl, Territorio, htl_table):
-    # Encontrar el índice del rango que corresponde
-    try:
-        # Obtener el índice del primer rango mayor o igual
-        index = htl_table[htl_table['RANGO HTL'] >= htl].index[0]
-        # Verificar si hay una fila anterior
-        if index > 0:
-            row = htl_table.iloc[index - 1]  # Fila anterior
-        else:
-            # Si no hay fila anterior, retornar un valor por defecto
-            row = htl_table.iloc[0]  # Primera fila como fallback
-    except IndexError:
-        # Si no se encuentra un índice correspondiente, usar la última fila como tope
-        row = htl_table.iloc[0]
-
-    # Devolver el valor según el tipo de Territorio
-    if Territorio == 'Territorio A':
-        return row['% CV PROP A']
-    elif Territorio == 'Territorio B':
-        return row['% CV PROP B']
-    elif Territorio == 'Territorio C':
-        return row['% CV PROP C']
-    else:
-        return np.nan
-
-# Asignar porcentajes según el territorio correspondiente
-merged_df['% CV PROP'] = merged_df.apply(
-    lambda row: find_cv_percentage(
-        row['HTL_Promedio_12MOPS'],
-        row['Territorio'],
-        tabla_hectolitraje  # Nombre del DataFrame que contiene "Tabla de Hectolitraje"
-    ), axis=1
-)
- 
-# # Asignar porcentajes según el territorio correspondiente
-# merged_df['% CV PROP'] = merged_df.apply(
-#     lambda row: find_cv_percentage(
-#         row['Grupo_HTL_12MOPS'],
-#         row['Territorio'],
-#         tabla_hectolitraje  # Nombre del DataFrame que contiene "Tabla de Hectolitraje"
-#     ), axis=1
-# )
-
-merged_df['Comisión_Cerveza_Prop'] = merged_df['VENTA CERVEZA'] * merged_df['% CV PROP']
-
+print("Shape base_comisiones:", base_comisiones.shape)
+print("Suma Total Income base_comisiones:", base_comisiones['Total Income'].sum())
+print("Shape merged_df:", merged_df.shape)
+print("Suma Total Income merged_df:", merged_df['Total Income'].sum())
 
 # Guardar el DataFrame combinado en un archivo Excel
 merged_df.to_parquet(f"Base_Final_Comisiones_Outliers.parquet", index=False)
 
+# Filtrar filas del año 2025
+df_2025 = merged_df[merged_df['Fecha_de_comisión'].dt.year == 2025]
+
+# Imprimir la suma de Beneficio_HSK
+print("Suma Beneficio HSK 2025:", df_2025['Beneficio_HSK'].sum())
+
 # %% [markdown]
-# # Analisis de las comisiones de cerveza
+# ## ahora si lo mero bueno miniño
+# 
 
 # %%
-#analisis de ajustes de comisión cerveza
+######################################################################################analisis de ajustes de comisión cerveza
 
 #Tomar la información más reciente de las tiendas del ultimo final de comisiones
 #filtrando solo info de los ultimos 24 meses, 12 registros como máximo por tienda
 
 desincorporaciones = pd.read_excel(r"C:\Users\dominh05\Documents\SIX\SA027\Acumulado Desincorporaciones.xlsx")
+
 # Cargar el archivo como DataFrame
-ultimo_final_de_comisiones = pd.read_excel(r"C:\Users\dominh05\Documents\SIX\Final comision\2025\Junio 2025.xlsx")
+ultimo_final_de_comisiones = pd.read_excel(r"C:\Users\dominh05\Documents\SIX\Final comision\2025\CÁLCULO DE COMISIÓN JULIO 25_NACIONAL.xlsx")
 ultimo_final_de_comisiones['Fecha Ingreso Tienda'] = pd.to_datetime(
     ultimo_final_de_comisiones['Fecha Ingreso Tienda'], errors='coerce'
 )
-
-ingreso_digno = 15000
 
 # Paso 1: Fecha más reciente
 fecha_mas_reciente = merged_df['Fecha_de_comisión'].max()
@@ -495,6 +326,8 @@ fecha_limite = fecha_mas_reciente - pd.DateOffset(years=2)
 # Paso 3: Filtrar últimos 2 años
 merged_df = merged_df[merged_df['Fecha_de_comisión'] >= fecha_limite]
 Analisis_de_comisión = merged_df
+
+ingreso_digno = 15000 *.85
 
 # paso 3.5 Quitar las desincorporaciones
 
@@ -532,7 +365,7 @@ Analisis_de_comisión = (
     .reset_index(drop=True)
 )
 # Exportar solo las primeras 200 filas
-Analisis_de_comisión.head(200).to_excel('analisis de comisión base.xlsx',index = False)
+#Analisis_de_comisión.to_excel('analisis de comisión base.xlsx',index = False)
 
 #creacion de dicionarios y columnas
 territory_map = Analisis_de_comisión.set_index('No.SAPDENEGOCIO')['Territorio'].to_dict()
@@ -540,7 +373,6 @@ porcentaje_de_contrato_map = Analisis_de_comisión.set_index('No.SAPDENEGOCIO')[
 porcentaje_reciente_map = Analisis_de_comisión.set_index('No.SAPDENEGOCIO')['% COM CERVEZA ULTIMO MES'].to_dict()
 porcentaje_hsk_map = Analisis_de_comisión.set_index('No.SAPDENEGOCIO')['Porcentaje_de_hsk'].to_dict()
 CV_map = Analisis_de_comisión.set_index('No.SAPDENEGOCIO')['CV'].to_dict()
-
 Region_map = Analisis_de_comisión.set_index('No.SAPDENEGOCIO')['REGION'].to_dict()
 
 # Crear un diccionario con No.SAPDENEGOCIO y Fecha de antiguedad
@@ -572,12 +404,8 @@ pivot_1 = pivot_1.join(pivot_count)
 
 pivot_1['Costo_Punto_Porcentual_Cerveza'] = pivot_1['VENTA CERVEZA'] * .01
 
-
-##################################################################
-
 # Asegúrate de que la columna sea datetime
 Analisis_de_comisión['Fecha_de_comisión'] = pd.to_datetime(Analisis_de_comisión['Fecha_de_comisión'])
-
 
 # Obtener el último registro por 'No.SAPDENEGOCIO' basado en la fecha
 ultimos_proveedores = Analisis_de_comisión.sort_values('Fecha_de_comisión') \
@@ -609,11 +437,6 @@ pivot_analisis = pivot_1.reset_index().merge(
     how='left'
 ).set_index('No.SAPDENEGOCIO')
 
-
-##########################
-
-
-
 # Agregar la columna "Territorio" al pivot usando map
 pivot_analisis['REGION'] = pivot_analisis.index.map(Region_map)
 pivot_analisis['Territorio'] = pivot_analisis.index.map(territory_map)
@@ -623,7 +446,6 @@ pivot_analisis['porcentaje_hsk'] = pivot_analisis.index.map(porcentaje_hsk_map)
 pivot_analisis['CV'] = pivot_analisis.index.map(CV_map)
 pivot_analisis['Fecha_Ingreso_Tienda'] = pivot_analisis.index.map(Fecha_Ingreso_Tienda_map)
 pivot_analisis['Fecha_Ingreso_Tienda'] = pd.to_datetime(pivot_analisis['Fecha_Ingreso_Tienda'], errors='coerce')
-
 
 # Función que asigna el % segun el territorio
 
@@ -650,7 +472,7 @@ def find_cv_percentage(htl, Territorio, htl_table):
     elif Territorio == 'Territorio C':
         return row['% CV PROP C']
     else:
-        return np.nan
+        return row['% CV PROP A']
 
 # Asignar porcentajes según el territorio correspondiente
 pivot_analisis['% CV PROP'] = pivot_analisis.apply(
@@ -664,13 +486,14 @@ pivot_analisis['% CV PROP'] = pivot_analisis.apply(
 pivot_analisis['Com_Cerveza_con_com_contrato'] = pivot_analisis['VENTA CERVEZA'] * pivot_analisis['porcentaje_de_contrato']
 pivot_analisis['Com_Cerveza_con_com_reciente'] = pivot_analisis['VENTA CERVEZA'] * pivot_analisis['porcentaje_reciente']
 pivot_analisis['Com_Cerveza_Prop'] = pivot_analisis['VENTA CERVEZA'] * pivot_analisis['% CV PROP']
+pivot_analisis['Com_Cerveza_HSK'] = pivot_analisis['VENTA CERVEZA'] * pivot_analisis['porcentaje_hsk']
 
 #saco cual porcentaje necesita para el ingreso dignos
 
 def simular_comision_para_ingreso_digno(row):
     venta_cerveza = row['VENTA CERVEZA']
     ingreso_base = row['Total Income(Sin subsidio ni Com Cerveza)']
-    ingreso_digno = 15000
+    ingreso_digno = 15000 * 0.85
 
     lista_incrementos = [0.04, 0.045, 0.05, 0.055, 0.06, 0.065, 0.07, 0.08, 0.09, 0.1,
                          0.11, 0.12, 0.13, 0.14, 0.15, 0.16, 0.17, 0.18, 0.19, 0.2,
@@ -686,12 +509,13 @@ def simular_comision_para_ingreso_digno(row):
 
     # Si ni con el 25% se alcanza el ingreso digno
     ingreso_maximo_posible = ingreso_base + (venta_cerveza * 0.25)
-    return 0, ingreso_maximo_posible, True
+    return .25, ingreso_maximo_posible, True
 
 #Aplicar la simulación para calcular el porcentaje necesario
 pivot_analisis[['% Necesario para ingreso Digno', 'Ingreso cerveza simulado con % necesario', 'Ni con 25% llega (Tiendas perdedoras)']] = (
     pivot_analisis.apply(simular_comision_para_ingreso_digno, axis=1, result_type='expand')
 )
+
 pivot_analisis['Comentarios'] = ''
 def comparar_porcentajes(row):
     com_necesario = row['% Necesario para ingreso Digno']
@@ -700,8 +524,6 @@ def comparar_porcentajes(row):
 
     if com_contrato >= com_necesario:
         return com_contrato  # El de contrato es suficiente
-    elif com_necesario == 0:
-        return com_contrato  # Si no necesita nada, se queda como está
     elif com_necesario <= com_sugerida:
         return com_necesario  # El sugerido puede cubrirlo
     else:
@@ -710,14 +532,16 @@ def comparar_porcentajes(row):
 #Aplicar la comparación entre porcentajes para determinar el porcentaje final a usar
 pivot_analisis['% Algoritmo'] = pivot_analisis.apply(comparar_porcentajes, axis=1)
 pivot_analisis['Ingreso con % Algoritmo'] =  pivot_analisis['Total Income(Sin subsidio ni Com Cerveza)'] + (pivot_analisis['VENTA CERVEZA'] * pivot_analisis['% Algoritmo'])
-
 pivot_analisis['dias_antiguedad'] = (fecha_mas_reciente - pivot_analisis['Fecha_Ingreso_Tienda']).dt.days
+
+pivot_analisis.to_excel('averwey2.xlsx')
+
 
 #####################################################################
 
 def obtener_porcentaje_ajustado_y_comentario(row):
     tienda_perdedora = row.get('Ni con 25% llega (Tiendas perdedoras)')
-    ingreso_digno = 15000
+    ingreso_digno = 15000 * 0.85
     ingreso = row.get('Total Income sin subsidio') 
     
     com_contrato = row.get('porcentaje_de_contrato')
@@ -727,6 +551,7 @@ def obtener_porcentaje_ajustado_y_comentario(row):
     com_reciente = row.get('porcentaje_reciente')
     ing_com_reciente = (row.get('Total Income(Sin subsidio ni Com Cerveza)') or 0) + (row.get('Com_Cerveza_con_com_reciente') or 0)
     com_hsk = row.get('porcentaje_hsk')
+    ing_com_hsk = (row.get('Total Income(Sin subsidio ni Com Cerveza)') or 0) + (row.get('Com_Cerveza_HSK') or 0)
     com_necesario_para_Ing_digno = row.get('% Necesario para ingreso Digno')    
     ing_com_necesario_para_Ing_digno = (row.get('Total Income(Sin subsidio ni Com Cerveza)') or 0) + (row.get('Ingreso cerveza simulado con % necesario') or 0)
     com_algoritmo = row.get('% Algoritmo')    
@@ -736,58 +561,74 @@ def obtener_porcentaje_ajustado_y_comentario(row):
     htl = row.get('HTL')
 
     if pd.isna(fecha_ingreso):
-        return None, "Fecha de ingreso no válida", None
+        return None, None
 
     antiguedad_dias = (fecha_mas_reciente - fecha_ingreso).days
     
-    # Aquí capeo a los de HSK
     if pd.notna(com_hsk):
-        return com_hsk, "Es HSK", ingreso
+        if ingreso >= ingreso_digno:
+            return com_hsk, ingreso
+        elif ing_com_hsk >= ingreso_digno:
+            return com_hsk, ing_com_hsk
+        else:
+            if ing_com_hsk < ingreso_digno:
+                return com_hsk, ing_com_hsk
+            else:
+                return com_hsk, ing_com_hsk
+
 
     #aqui saco las tiendas perdedoras
     elif  tienda_perdedora == True:
-        return com_contrato, "Ni con 25% alcanza ingreso digno - Plan de rescate", ingreso
+        if com_sugerida > com_contrato:
+            return com_sugerida, ing_com_sugerida
+        else:
+            return com_contrato, ing_com_contrato
+
+#####################################################################
 
     #aqui capeo a los de nuevo ingreso
     elif antiguedad_dias <= 365 and ingreso >= ingreso_digno:
-        return com_contrato, "New SK - Cubierto por política de Subsidios", ingreso
+        return com_contrato, ingreso
         #return com_contrato, "New SK - Ingreso digno, la antigüedad en política de subsidios y promedia arriba de 11 hL Avg", ingreso
     
     elif antiguedad_dias <= 365 and htl <= 11:
-        return com_contrato, "New SK - Cubierto por política de Subsidios", ingreso
+        return com_contrato, ingreso
         #return com_contrato, "New SK - Subsidiado - La antigüedad entra en política de subsidios y promedia <=11 hL Avg", ingreso
 
     elif antiguedad_dias <= 365 and htl > 11 and ingreso < ingreso_digno:
         #aqui capeas los que con un ajuste llegan a ingreso digno
         if ing_com_algoritmo >= ingreso_digno:       
-            return com_algoritmo, "New SK - Necesita ajuste para llegar a Ingreso Digno", ing_com_algoritmo
+            return com_algoritmo, ing_com_algoritmo
         #aqui capeas los que con un ajuste ARRIBA DEL PROMEDIO llegan a ingreso digno
         elif ing_com_necesario_para_Ing_digno >=  ingreso_digno:
-            return com_necesario_para_Ing_digno, "New SK - Necesita ajuste extraordinario para llegar a Ingreso Digno pero andan arriba de 11 hL", ing_com_necesario_para_Ing_digno
+            return com_necesario_para_Ing_digno, ing_com_necesario_para_Ing_digno
     #los que no 
     elif ingreso < ingreso_digno and com_sugerida <= com_contrato:
-        return com_contrato, "No alcanza ingreso digno, pero ya está ajustado o excede tabulador", ingreso
+        return com_contrato, ingreso
+    
     #esta ahora si es la razita que ocupa ajuste
     elif ingreso < ingreso_digno and com_sugerida > com_contrato:
         if ing_com_algoritmo >= ingreso_digno:       
-            return com_algoritmo, "No alcanza ingreso digno - Necesita ajuste para llegar a Ingreso Digno", ing_com_algoritmo
+            return com_algoritmo, ing_com_algoritmo
+        
         #aqui capeas los que con un ajuste ARRIBA DEL PROMEDIO llegan a ingreso digno
         elif ing_com_necesario_para_Ing_digno >=  ingreso_digno:
-            return com_necesario_para_Ing_digno, "No alcanza ingreso digno - Necesita ajuste extraordinario a Ingreso Digno", ing_com_necesario_para_Ing_digno
+            return com_necesario_para_Ing_digno, ing_com_necesario_para_Ing_digno
+        
     # aqui capeo a los que ya andan en sueldo digno
     elif ingreso >= ingreso_digno and com_sugerida > com_contrato and com_sugerida > com_reciente:
-        return com_contrato, "Ya tiene ingreso digno pero podríamos aumentar su comisión", ingreso
+        return com_contrato, ingreso
     elif ingreso >= ingreso_digno and com_sugerida == com_contrato and com_sugerida == com_reciente:
-        return com_contrato, "Ya tiene ingreso digno", ingreso
+        return com_contrato, ingreso
     elif ingreso >= ingreso_digno and com_sugerida < com_contrato and com_sugerida < com_reciente:
-        return com_contrato, "Ya tiene ingreso digno", ingreso
+        return com_contrato, ingreso
         #return com_contrato, "Ya tiene ingreso digno pero podríamos reducir su comisión", ingreso
     elif ingreso >= ingreso_digno:
-        return com_contrato, "Ya tiene ingreso digno", ingreso  
+        return com_contrato, ingreso  
         #return com_contrato, "Ya tiene ingreso digno, nomas validale", ingreso       
     return None, "", None
 
-pivot_analisis[['% Necesario para ingreso Digno', 'Comentarios', 'Ingreso Total Simulado']] = pivot_analisis.apply(
+pivot_analisis[['% Necesario para ingreso Digno', 'Ingreso Total Simulado']] = pivot_analisis.apply(
     obtener_porcentaje_ajustado_y_comentario, axis=1, result_type='expand'
 )
 
@@ -850,11 +691,13 @@ pivot_analisis.loc[pd.notna(pivot_analisis['% Prop3']), '% Algoritmo'] = pivot_a
 # Eliminamos la columna auxiliar
 pivot_analisis.drop(columns=['% Prop3'], inplace=True)
 
+#####
+# el vs contra el último store keeper
 
 # Condición 1
 condicion_1 = (
     (pivot_analisis['Total Income(Sin subsidio ni Com Cerveza) (Último proveedor)'] +
-     pivot_analisis['VENTA CERVEZA (Último proveedor)'] * pivot_analisis['porcentaje_de_contrato']) > 15000
+     pivot_analisis['VENTA CERVEZA (Último proveedor)'] * pivot_analisis['porcentaje_de_contrato']) > ingreso_digno
 ) & (
     pivot_analisis['Comentarios'].isin([
         "Ni con 25% alcanza ingreso digno - Plan de rescate",
@@ -867,7 +710,7 @@ pivot_analisis.loc[condicion_1, 'Comentarios'] = "Plan de rescate - New SK reach
 # Condición 2
 condicion_2 = (
     (pivot_analisis['Total Income(Sin subsidio ni Com Cerveza) (Último proveedor)'] +
-     pivot_analisis['VENTA CERVEZA (Último proveedor)'] * pivot_analisis['% CV PROP']) > 15000
+     pivot_analisis['VENTA CERVEZA (Último proveedor)'] * pivot_analisis['% CV PROP']) > ingreso_digno
 ) & (
     pivot_analisis['Comentarios'].isin([
         "Ni con 25% alcanza ingreso digno - Plan de rescate",
@@ -880,34 +723,41 @@ pivot_analisis.loc[condicion_2, 'Comentarios'] = "Plan de rescate - New SK reach
 def audiencias(row): 
     comentario = row['Comentarios']
     
-    if comentario == 'Es HSK':
+    if comentario in [
+        "Es HSK ya con ingreso digno",
+        "Es HSK y alcanzará ingreso digno con el boost",
+        "Es HSK pero necesita algo más",
+        "Es HSK, validar por que no cayo en otro bracket"
+    ]:
         return 'HSK'
     
     elif comentario in [
         '425 de NW',
-        'New SK - Cubierto por política de Subsidios',
         'Ya tiene ingreso digno',
-        'Ya tiene ingreso digno pero podríamos aumentar su comisión'
+        'Ya tiene ingreso digno pero podríamos aumentar su comisión',
+        'Plan de rescate - New SK reaches TI',
+        'Plan de rescate - New SK reaches TI with adjustment'
     ]:
         return 'Base'
     
     elif comentario in [
-        'Ni con 25% alcanza ingreso digno - Plan de rescate',
         'No alcanza ingreso digno, pero ya está ajustado o excede tabulador',
-        'Plan de rescate - New SK reaches TI',
-        'Plan de rescate - New SK reaches TI with adjustment'
+        "Ni con 25% alcanza ingreso digno, subir a comisión sugerida- Plan de rescate",
+        "Ni con 25% alcanza ingreso digno, mantener en % contrato - Plan de rescate"
     ]:
         return 'Plan de rescate'
     
     elif comentario in [
+        'New SK - Con ingreso digno',
+        'New SK - Cubierto por política de Subsidios',  
         'New SK - Necesita ajuste extraordinario para llegar a Ingreso Digno pero andan arriba de 11 hL',
         'New SK - Necesita ajuste para llegar a Ingreso Digno'
     ]:
         return 'Nuevos SK'
     
     elif comentario in [
-        'No alcanza ingreso digno - Necesita ajuste extraordinario a Ingreso Digno',
-        'No alcanza ingreso digno - Necesita ajuste para llegar a Ingreso Digno'
+        'Plan de rescate -No alcanza ingreso digno - Necesita ajuste extraordinario a Ingreso Digno',
+        'Plan de rescate -No alcanza ingreso digno - Necesita ajuste para llegar a Ingreso Digno'
     ]:
         return 'A Variabilizar'
     
@@ -916,33 +766,20 @@ def audiencias(row):
 
 pivot_analisis['Audiencias'] = pivot_analisis.apply(audiencias, axis=1)
 
-# Contar cuántos proveedores distintos tiene cada negocio
-conteo_proveedores = Analisis_de_comisión.groupby('No.SAPDENEGOCIO')['NoDEPROVEEDOR'].nunique().reset_index()
-conteo_proveedores = conteo_proveedores.rename(columns={'NoDEPROVEEDOR': 'Cantidad_de_Proveedores_Distintos'})
-
-# Agregar el conteo a pivot_analisis
-# pivot_analisis = pivot_analisis.reset_index().merge(
-#     conteo_proveedores,
-#     on='No.SAPDENEGOCIO',
-#     how='left'
-# ).set_index('No.SAPDENEGOCIO')
-
-
-# Asegúrate de que el índice de conteo_proveedores sea No.SAPDENEGOCIO
-conteo_proveedores = Analisis_de_comisión.groupby('No.SAPDENEGOCIO')['NoDEPROVEEDOR'] \
-    .nunique() \
+conteo_proveedores = (
+    Analisis_de_comisión.groupby('No.SAPDENEGOCIO')['NoDEPROVEEDOR']
+    .nunique()
     .rename('Cantidad_de_Proveedores_Distintos')
+    .reset_index()
+)
 
-# Hacer el join directo sin resetear el índice de pivot_analisis
-pivot_analisis = pivot_analisis.join(conteo_proveedores)
 
-
+pivot_analisis = pivot_analisis.merge(conteo_proveedores, on='No.SAPDENEGOCIO', how='left')
 
 # Guardar el DataFrame combinado en un archivo Excel
-pivot_analisis.to_excel('pivot 2.5do draft.xlsx', index=False)
-
-
+pivot_analisis.to_excel('pivot 3do draft.xlsx', index=False)
 print("Archivo guardado éxitosamente")
+
 # Fin de medición
 end_time = time.time()
 
@@ -971,3 +808,6 @@ else:
 
 # Terminar pygame
 pygame.quit()
+
+
+
