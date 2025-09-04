@@ -1,0 +1,89 @@
+import pandas as pd
+
+base_bajas = pd.read_excel(r"C:\Users\dominh05\Documents\SIX\Rotación SK\Radiografia Dash.xlsx", sheet_name='B.Bajas')
+
+campos = [
+    "SOLICITUD FINQ",
+    "TIPO DE BAJA",
+    "NUMERO DE PROVEEDOR",
+    "NOMBRE DEL COMERCIANTE",
+    "NUMERO DE NEGOCIO",
+    "NOMBRE DEL NEGOCIO",
+    "REGION",
+    "ZONA",
+    "PLAZA",
+    "FECHA DE BAJA",
+    "CAUSA DE BAJA",
+    "MOTIVOS",
+    "MONTO EN CASO DE FALTANTE",
+    "NUMERO DE SOCIO",
+    "NOMBRE OPERADOR RH",
+    "NOMBRE ASESOR RH",
+    "NOMBRE DEL JEFE DE OPERACIONES (JOS)",
+    "Mes",
+    "Año",
+    "Incidencia MES",
+    "Aplica CoVa",
+    "Cuenta Baja KPI"
+]
+base_bajas = base_bajas[campos]
+
+base_bajas["fecha"] = pd.to_datetime(
+    base_bajas["Año"].astype(str) + "-" + base_bajas["Mes"].astype(str) + "-01",
+    format="%Y-%m-%d",
+    errors="coerce"
+)
+
+
+base_bajas.to_excel(r"C:\Users\dominh05\Documents\SIX\Rotación SK\Radiografia BAJAS para Dash.xlsx", index=False)
+
+
+base_altas = pd.read_excel(r"C:\Users\dominh05\Documents\SIX\Rotación SK\Radiografia Dash.xlsx", sheet_name='A.Altas')
+
+campos_alta = [
+    "SOLICITUD FINQ",
+    "TIPO SIX",
+    "TIPO DE ALTA",
+    "CeCo",
+    "NOMBRE DEL NEGOCIO",
+    "PORCENTAJE DE COMISION",
+    "REGION",
+    "ZONA",
+    "PLAZA",
+    "NUMERO DE PROVEEDOR",
+    "NOMBRE DEL COMERCIANTE",
+    "CONTRATO",
+    "NOMBRE",
+    "VALID NOMBRE",
+    "NOMBRE",
+    "APELLIDO PATERNO",
+    "APELLIDO MATERNO",
+    "FECHA",
+    "CALLE",
+    "NO. EXTERIOR",
+    "COLONIA",
+    "PAÍS",
+    "ESTADO",
+    "POBLACIÓN",
+    "RFC",
+    "CORREO DESPACHO",
+    "CLABE INTERBANCARIA",
+    "BANCO",
+    "CB",
+    '¿Cuenta CoVa?',
+    'Incidencia MES',
+    'Mes',
+    'Año',
+    'Aplica Garantia'
+]
+
+base_altas = base_altas[campos_alta]
+
+base_altas["fecha"] = pd.to_datetime(
+    base_altas["Año"].astype(str) + "-" + base_altas["Mes"].astype(str) + "-01",
+    format="%Y-%m-%d",
+    errors="coerce"
+)
+
+
+base_altas.to_excel(r"C:\Users\dominh05\Documents\SIX\Rotación SK\Radiografia ALTAS para Dash.xlsx", index=False)
