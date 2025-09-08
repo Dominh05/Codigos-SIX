@@ -1,0 +1,60 @@
+import pandas as pd
+
+#da forma a la data del dashboard de ray, de la pestaña de downloads y da formato para meterlo en el excel de personal expenses
+##!! abajo tiene una funcion donde manualmente le tengo que poner los meses que estoy sumando para obtener el budget
+
+## ver 2.0 #esta funcion en 2025 la actualizamos a solo los meses que van del año
+
+mes = 'julio'
+
+df= pd.read_excel(f'data {mes}.xlsx')
+nombres_viejos = ['Agrupador', 'Desc 4', 'Jer 2','Jer1']
+nuevos_nombres = ['01. Database[Grupo 2025]', '01. Database[Sub sub agrupador 2025]', '01. Database[Desc L6]','01. Database[DESC L5]']
+
+# Crear un diccionario de mapeo entre los nombres viejos y nuevos
+cambio_nombres = dict(zip(nuevos_nombres, nombres_viejos))
+
+# Renombrar las columnas usando el diccionario de mapeo
+df = df.rename(columns=cambio_nombres)
+
+# Crear las columnas "Sum Enero (A)", "Sum Febrero (A)", ..., "Sum Diciembre (A)"
+for i in range(1, 13):  # Rango de 1 a 12 para los meses
+    column_name = f'{pd.to_datetime(f"2025-{i}-01").strftime("%B")} (A)'  # Nombre de las columnas
+    df[column_name] = df.apply(lambda x: x['[Actuals]']*1000000 if x['03. Cat. Periodos[Period]'] == i else "", axis=1)
+
+columns_to_sum = ['January (A)', 'February (A)', 'March (A)', 'April (A)', 'May (A)',
+                  'June (A)', 'July (A)'#, 'August (A)', 'September (A)', 'October (A)',
+                  #'November (A)', 'December (A)'
+                  ]
+
+# Convertir cada columna a numérico
+df[columns_to_sum] = df[columns_to_sum].apply(pd.to_numeric, errors='coerce')
+
+# Crear la columna 'YTD' sumando los valores de las 12 columnas correspondientes a los meses
+df['YTD'] = df[['January (A)', 'February (A)', 'March (A)', 'April (A)', 'May (A)', 
+                'June (A)', 'July (A)'#, 'August (A)', 'September (A)', 'October (A)', 
+                #'November (A)', 'December (A)'
+                ]].sum(axis=1)
+
+
+for i in range(1, 13):  # Rango de 1 a 12 para los meses
+    column_name = f'{pd.to_datetime(f"2025-{i}-01").strftime("%B")} (B)'  # Nombre de las columnas
+    df[column_name] = df.apply(lambda x: x['[AP]']*1000000 if x['03. Cat. Periodos[Period]'] == i else "", axis=1)
+
+columns_to_sum_budget = ['January (B)', 'February (B)', 'March (B)', 'April (B)', 'May (B)',
+                  'June (B)', 'July (B)'#, 'August (B)', 'September (B)', 'October (B)',
+                  #'November (B)', 'December (B)'
+                  ]
+
+# Convertir cada columna a numérico
+df[columns_to_sum_budget] = df[columns_to_sum_budget].apply(pd.to_numeric, errors='coerce')
+
+# 2.0 esta en 2025 la actualizamos a solo los meses que van del año
+# Crear la columna 'YTD' sumando los valores de las 12 columnas correspondientes a los meses
+df['YTD Budget'] = df[['January (B)','February (B)', 'March (B)', 'April (B)', 'May (B)', 
+                'June (B)', 'July (B)'#, 'August (B)' ,'September (B)','October (B)',  'November (B)','December (B)'
+                ]].sum(axis=1)
+
+df['Var BGT'] =  df['YTD Budget'] -df['YTD']
+
+df.to_excel(f'Personnel Expenses BBDD {mes}.xlsx', index = False)
