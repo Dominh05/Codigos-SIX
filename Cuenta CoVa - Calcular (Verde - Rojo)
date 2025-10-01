@@ -1,0 +1,64 @@
+import pandas as pd
+import numpy as np
+
+abc_bajas_mes = pd.read_excel(r"C:\Users\dominh05\Documents\SIX\Rotación SK\CIERRE SEPTIEMBRE 2025.xlsx",sheet_name='B. Bajas')
+abc_altas_mes = pd.read_excel(r"C:\Users\dominh05\Documents\SIX\Rotación SK\CIERRE SEPTIEMBRE 2025.xlsx",sheet_name='A. Alta', skiprows=1)
+
+#!!!!!!!!!!!!!!!!!!!!!! ocupas crear manual la columna de incidencia (Verde o Rojo)
+
+# Altas
+def calcular_inventario(row):
+    if (
+        row['TIPO DE GARANTIA'] not in ["4) RECLASIFICACION TRANSF GARANTIA", "3) ESCRITURADA"]
+        and row['GARANTIA A SOLICITAR (>=30% INVENTARIO)'] not in ["Pendiente", "Indirecto"]
+    ):
+        try:
+            return row['GARANTIA A SOLICITAR (>=30% INVENTARIO)'] / 0.3
+        except ZeroDivisionError:
+            return np.nan
+    return np.nan
+
+abc_altas_mes['Inventario'] = abc_altas_mes.apply(calcular_inventario, axis=1)
+
+def calcular_rango(row):
+    # condiciones de exclusión
+    if (row['TIPO DE GARANTIA'] not in ["4) RECLASIFICACION TRANSF GARANTIA", "3) ESCRITURADA"]) and \
+       (row['GARANTIA A SOLICITAR (>=30% INVENTARIO)'] != "Indirecto"):
+        
+        if row['Inventario'] > 0:  # evitar división entre 0
+            ratio = row['MONTO GARANTIA'] / row['Inventario']
+            if ratio >= 0.30:
+                return 0.30
+            else:
+                return ratio
+    return np.nan
+
+abc_altas_mes['Rango Garantia'] = abc_altas_mes.apply(calcular_rango, axis=1)
+
+def calcular_cuenta_cova(row):
+    if row['TIPO SIX'] == 'DIRECTO' and row['Color de Fila'] == 'Verde':
+        if row['REGION'] in ['Noroeste','Sureste'] and row['Rango Garantia'] >= 0.25:
+            return "Si"
+        elif row['REGION'] in ['Occidente','Centro'] and row['Rango Garantia'] >= 0.20:
+            return "Si"
+        elif row['REGION'] == 'Noreste' and row['Rango Garantia'] >= 0.15:
+            return "Si"
+    return "No"
+
+abc_altas_mes['Cuenta CoVa'] = abc_altas_mes.apply(calcular_cuenta_cova, axis=1)
+
+
+# Bajas
+
+def calcular_cuenta_cova_bajas(row):
+    # condiciones de inclusión
+    if (
+        row['Incidencia MES'] == "Verde"
+        and row['TIPO DE BAJA'] == "1) ROTACION"
+        and row['CAUSA DE BAJA'] not in ["CIERRE_DEFINITIVO_DE_NEGOCIO", "VBO_CAMBIO_ENTRE_FAMILIARES_DIRECTOS"]
+    ):
+        return "Si"
+    else:
+        return "No"
+
+abc_bajas_mes['Cuenta CoVa'] = abc_bajas_mes.apply(calcular_cuenta_cova_bajas, axis=1)
