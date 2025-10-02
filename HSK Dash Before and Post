@@ -1,0 +1,476 @@
+# %%
+import pandas as pd
+
+hsk = pd.read_excel(r"C:\Users\dominh05\Documents\SIX\HSK\Resultados 2025\Historico Resultados HSK base Monstruosa.xlsx")
+op_historico = pd.read_parquet(r"C:\Users\dominh05\Documents\SIX\Codigos_six\Comisiones\Bases Fregonas\OP_Historico_2025_Ago_Final.parquet")
+acumulado_bajas = pd.read_excel('Historico Bajas Cuenta KPI.xlsx')
+final_de_comisiones = pd.read_parquet(r"C:\Users\dominh05\Documents\SIX\Codigos_six\Comisiones\Bases Fregonas\Final_de_comisiones.parquet")
+com_contrato =  pd.read_excel(r"C:\Users\dominh05\Documents\SIX\HSK\Tabulador Ene - Jun_2025 - Jul.xlsx")
+
+# %%
+# Ordena el DataFrame hsk por 'Fecha de tabulador' de pasado a futuro
+hsk['Fecha de tabulador'] = pd.to_datetime(hsk['Fecha de tabulador'])
+hsk = hsk.sort_values('Fecha de tabulador')
+
+# Obtén la primera aparición de 'Fecha de tabulador' para cada 'CeCo'
+Inicio_en_hsk = hsk.groupby('CeCo')['Fecha de tabulador'].first()
+
+# Crea la columna 'Fecha de ingreso a HSK' usando el mapeo
+hsk['Fecha de ingreso a HSK'] = hsk['CeCo'].map(Inicio_en_hsk)
+
+# Crear un calendario de meses del 2023-01 al último mes en hsk
+calendario = pd.date_range(start="2023-03-01", end=hsk['Fecha de tabulador'].max(), freq="MS")  # MS = Month Start
+
+# Crear producto cartesiano de CeCos x calendario
+cecos_unicos = hsk['CeCo'].unique()
+multi_index = pd.MultiIndex.from_product([cecos_unicos, calendario], names=['CeCo', 'Fecha de tabulador'])
+base_cecos = pd.DataFrame(index=multi_index).reset_index()
+
+# Asegura que las columnas están bien nombradas y no hay columnas extra
+#base_cecos = base_cecos.loc[:, ['CeCo', 'Fecha de tabulador']]
+
+# Traer info de primera aparición
+info_inicial = hsk.groupby('CeCo').first().reset_index()
+
+# Mapear columnas de primera aparición
+for col in ['Región','Nombre de tienda','Tipo','GZ SIX','# SK','Nombre SK','Wave']:
+    if col in info_inicial.columns:
+        base_cecos[col] = base_cecos['CeCo'].map(info_inicial.set_index('CeCo')[col])
+
+# Mapear fecha de ingreso y última aparición
+base_cecos['Fecha de ingreso a HSK'] = base_cecos['CeCo'].map(Inicio_en_hsk)
+ultima_fecha_ceco = hsk.groupby('CeCo')['Fecha de tabulador'].max()
+base_cecos['Ultima_Fecha'] = base_cecos['CeCo'].map(ultima_fecha_ceco)
+# Mapear fecha de ingreso y última aparición
+base_cecos['Fecha de ingreso a HSK'] = base_cecos['CeCo'].map(Inicio_en_hsk)
+ultima_fecha_ceco = hsk.groupby('CeCo')['Fecha de tabulador'].max()
+base_cecos['Ultima_Fecha'] = base_cecos['CeCo'].map(ultima_fecha_ceco)
+
+# Etiquetar Before / Durante / Post
+def etapa(row):
+    if pd.isna(row['Fecha de ingreso a HSK']):
+        return "Before HSK"
+    elif row['Fecha de tabulador'] < row['Fecha de ingreso a HSK']:
+        return "Before HSK"
+    elif row['Fecha de tabulador'] > row['Ultima_Fecha']:
+        return "Post HSK"
+    else:
+        return "HSK Activo"
+
+base_cecos['Etapa'] = base_cecos.apply(etapa, axis=1)
+
+
+# 🔹 Crear llave única para detectar duplicados (CeCo + Fecha)
+hsk['llave'] = hsk['CeCo'].astype(str) + hsk['Fecha de tabulador'].dt.strftime('%Y-%m-%d')
+base_cecos['llave'] = base_cecos['CeCo'].astype(str) + base_cecos['Fecha de tabulador'].dt.strftime('%Y-%m-%d')
+
+# 🔹 Filtrar solo los registros de base_cecos que NO estén ya en hsk
+base_cecos_nuevos = base_cecos[~base_cecos['llave'].isin(hsk['llave'])]
+
+# 🔹 Concatenar hsk con los nuevos (sin duplicar los reales)
+hsk = pd.concat([hsk, base_cecos_nuevos], ignore_index=True)
+
+# 🔹 Ordenar y limpiar
+hsk = hsk.sort_values('Fecha de tabulador').reset_index(drop=True)
+hsk.drop(columns=['llave'], inplace=True)
+base_cecos.drop(columns=['llave'], inplace=True)
+
+# Obtén la primera aparición de 'Tipo' para cada 'CeCo'
+Ola_hsk = hsk.groupby('CeCo')['Tipo'].first()
+
+# Crea la columna 'validacion' usando el mapeo
+hsk['validacion'] = hsk['CeCo'].map(Ola_hsk)
+
+# Crea las columnas Mes, Año y Año_LY
+hsk['Mes'] = hsk['Fecha de tabulador'].dt.month.astype(str)
+hsk['Año'] = hsk['Fecha de tabulador'].dt.year.astype(str)
+hsk['Año_LY'] = (hsk['Fecha de tabulador'].dt.year - 1).astype(str)
+hsk['Fecha'] = hsk['Fecha de tabulador']
+hsk['Fecha LY'] = hsk['Fecha'] - pd.DateOffset(years=1)
+
+# %% [markdown]
+# ## Ola 3 WE
+
+# %%
+# Convierte la columna a datetime por si acaso
+hsk['Fecha de tabulador'] = pd.to_datetime(hsk['Fecha de tabulador'])
+
+# Define la fecha de corte
+fecha_corte = pd.Timestamp('2025-06-01')
+
+# Filtro para Región WE y Año 2025 y Fecha de tabulador >= 1/6/2025
+filtro_we_ola3 = (
+    (hsk['Fecha de tabulador'] >= fecha_corte) &
+    (hsk['Año'] == '2025') &
+    (hsk['Región'] == 'WE')
+)
+
+# Para esas filas, asigna la primera aparición de Fecha de tabulador a partir de 1/6/2025 para cada CeCo
+primer_fecha_ola3 = (
+    hsk.loc[filtro_we_ola3]
+    .groupby('CeCo')['Fecha de tabulador']
+    .first()
+)
+
+# Asigna el resultado solo a las filas que cumplen el filtro
+hsk.loc[filtro_we_ola3, 'Fecha de ingreso a HSK'] = hsk.loc[filtro_we_ola3, 'CeCo'].map(primer_fecha_ola3)
+
+# 🔹 Nuevo paso: actualizar Tipo a "OLA3" para esas filas
+hsk.loc[filtro_we_ola3, 'validacion'] = "OLA3"
+
+hsk['Wave'] = hsk['validacion']
+
+# %% [markdown]
+# ## Da formato a las columnas que utilizaremos
+
+# %%
+# Normaliza tipos en hsk
+hsk['Año'] = hsk['Año'].astype(int).astype(str)
+hsk['Mes'] = hsk['Mes'].astype(int).astype(str)
+hsk['CeCo'] = hsk['CeCo'].astype(str)
+hsk['# SK'] = hsk['# SK'].astype(str)
+
+# Llaves y concatenaciones en hsk
+hsk['concat_ay'] = hsk['CeCo'] + hsk['Mes'] + hsk['Año']
+hsk['concat_ly'] = hsk['CeCo'] + hsk['Mes'] + (hsk['Año'].astype(int) - 1).astype(str)
+hsk['llave_proveedor_ay'] = hsk['# SK'] + hsk['Mes'] + hsk['Año']
+hsk['Nombre SK'] = hsk['Nombre SK'].astype(str)
+hsk['Nombre SK'] = hsk['Nombre SK'].astype(str)
+hsk['llave_proveedor_ly'] = hsk['# SK'] + hsk['Mes'] + (hsk['Año'].astype(int) - 1).astype(str)
+
+# Normaliza tipos en acumulado_bajas
+acumulado_bajas['Año'] = acumulado_bajas['Año'].astype(int).astype(str)
+acumulado_bajas['Mes'] = acumulado_bajas['Mes'].astype(int).astype(str)
+acumulado_bajas['NUMERO DE NEGOCIO'] = acumulado_bajas['NUMERO DE NEGOCIO'].astype(str)
+acumulado_bajas['NUMERO DE PROVEEDOR'] = acumulado_bajas['NUMERO DE PROVEEDOR'].astype(str)
+
+# Llaves y concatenaciones en acumulado_bajas
+acumulado_bajas['concat_ay'] = acumulado_bajas['NUMERO DE NEGOCIO'] + acumulado_bajas['Mes'] + acumulado_bajas['Año']
+acumulado_bajas['concat_ly'] = acumulado_bajas['NUMERO DE NEGOCIO'] + acumulado_bajas['Mes'] + (acumulado_bajas['Año'].astype(int) - 1).astype(str)
+acumulado_bajas['llave_proveedor_ay'] = acumulado_bajas['NUMERO DE PROVEEDOR'] + acumulado_bajas['Mes'] + acumulado_bajas['Año']
+acumulado_bajas['llave_proveedor_ly'] = acumulado_bajas['NUMERO DE PROVEEDOR'] + acumulado_bajas['Mes'] + (acumulado_bajas['Año'].astype(int) - 1).astype(str)
+
+# Función de asignación de bajas
+def agregar_bajas_a_hsk(hsk_df, bajas_df):
+    conteo_ay = bajas_df['llave_proveedor_ay'].value_counts()
+    conteo_ly = bajas_df['concat_ay'].value_counts()
+    
+    hsk_df['baja'] = hsk_df['llave_proveedor_ay'].map(conteo_ay).fillna(0).astype(int)
+    hsk_df['baja ly'] = hsk_df['concat_ly'].map(conteo_ly).fillna(0).astype(int)
+    
+    return hsk_df
+
+# Uso
+hsk = agregar_bajas_a_hsk(hsk, acumulado_bajas)
+
+# Crear diccionario de mapeo a partir de com_contrato
+# Asegurar que las llaves del mapeo sean texto
+map_dict = dict(zip(com_contrato['No.deNegocio'].astype(str), com_contrato['Tabulador 2025']))
+
+# Asegurar que la columna CeCo sea texto antes de mapear
+hsk['tradicional'] = hsk['CeCo'].astype(str).map(map_dict)
+
+# %% [markdown]
+# # Graduados
+
+# %%
+# Para contar aparición acumulada de cada CeCo (1ª, 2ª, 3ª, etc.)
+hsk['Aparicion'] = hsk.groupby('CeCo').cumcount() + 1
+
+# También calculamos el número máximo de apariciones por CeCo
+max_apariciones = hsk.groupby('CeCo')['Aparicion'].transform('max')
+
+# Reemplazamos el número de la última aparición por "Última"
+hsk['Aparicion'] = hsk.apply(
+    lambda row: 99999999 if row['Aparicion'] == max_apariciones[row.name] else row['Aparicion'],
+    axis=1
+)
+
+hsk['Status'] = "Activa"
+
+hsk['CeCo_count'] = hsk.groupby('CeCo')['CeCo'].transform('count')
+hsk = hsk.sort_values('Fecha de tabulador')
+
+
+def fill_pct_nuevo(group):
+    group = group.sort_values('Fecha de tabulador')  # asegurar orden correcto
+
+    mask = (group['Etapa'] == 'HSK Activo') & (group['% Nuevo'].isna())
+
+    # Hacer bfill solo para esas filas, usando todo el grupo
+    group.loc[mask, '% Nuevo'] = group['% Nuevo'].bfill()[mask]
+
+    return group
+
+hsk = hsk.sort_values(['CeCo', 'Fecha de tabulador'])
+hsk = hsk.groupby('CeCo', group_keys=False).apply(fill_pct_nuevo)
+
+
+# Filtra el DataFrame para CeCo == '301372092' y muestra el resultado
+filtro = hsk[hsk['CeCo'] == '301372092']
+print(filtro)
+
+
+
+
+# %%
+# Ordena el DataFrame hsk por 'Fecha de tabulador' de pasado a futuro
+hsk['Fecha de tabulador'] = pd.to_datetime(hsk['Fecha de tabulador'])
+hsk = hsk.sort_values('Fecha de tabulador')
+
+# Obtén la primera aparición de 'Fecha de tabulador' para cada 'CeCo'
+Inicio_en_hsk = hsk.groupby('CeCo')['Fecha de tabulador'].first()
+
+# Crea la columna 'Fecha de ingreso a HSK' usando el mapeo
+hsk['Fecha de ingreso a HSK'] = hsk['CeCo'].map(Inicio_en_hsk)
+
+# Crear un calendario de meses del 2023-03 al último mes en hsk
+calendario = pd.date_range(start="2023-03-01", end=hsk['Fecha de tabulador'].max(), freq="MS")  # MS = Month Start
+
+# Crear producto cartesiano de CeCos x calendario
+cecos_unicos = hsk['CeCo'].unique()
+multi_index = pd.MultiIndex.from_product([cecos_unicos, calendario], names=['CeCo', 'Fecha de tabulador'])
+base_cecos = pd.DataFrame(index=multi_index).reset_index()
+
+# Asegura que las columnas están bien nombradas y no hay columnas extra
+#base_cecos = base_cecos.loc[:, ['CeCo', 'Fecha de tabulador']]
+
+# Traer info de primera aparición
+info_inicial = hsk.groupby('CeCo').first().reset_index()
+
+# Mapear columnas de primera aparición
+for col in ['Región','Nombre de tienda','Tipo','GZ SIX','# SK','Nombre SK','Wave']:
+    if col in info_inicial.columns:
+        base_cecos[col] = base_cecos['CeCo'].map(info_inicial.set_index('CeCo')[col])
+
+# Mapear fecha de ingreso y última aparición
+base_cecos['Fecha de ingreso a HSK'] = base_cecos['CeCo'].map(Inicio_en_hsk)
+ultima_fecha_ceco = hsk.groupby('CeCo')['Fecha de tabulador'].max()
+base_cecos['Ultima_Fecha'] = base_cecos['CeCo'].map(ultima_fecha_ceco)
+# Mapear fecha de ingreso y última aparición
+base_cecos['Fecha de ingreso a HSK'] = base_cecos['CeCo'].map(Inicio_en_hsk)
+ultima_fecha_ceco = hsk.groupby('CeCo')['Fecha de tabulador'].max()
+base_cecos['Ultima_Fecha'] = base_cecos['CeCo'].map(ultima_fecha_ceco)
+
+# Etiquetar Before / Durante / Post
+def etapa(row):
+    if pd.isna(row['Fecha de ingreso a HSK']):
+        return "Before HSK"
+    elif row['Fecha de tabulador'] < row['Fecha de ingreso a HSK']:
+        return "Before HSK"
+    elif row['Fecha de tabulador'] > row['Ultima_Fecha']:
+        return "Post HSK"
+    else:
+        return "HSK Activo"
+
+base_cecos['Etapa'] = base_cecos.apply(etapa, axis=1)
+
+
+# 🔹 Crear llave única para detectar duplicados (CeCo + Fecha)
+hsk['llave'] = hsk['CeCo'].astype(str) + hsk['Fecha de tabulador'].dt.strftime('%Y-%m-%d')
+base_cecos['llave'] = base_cecos['CeCo'].astype(str) + base_cecos['Fecha de tabulador'].dt.strftime('%Y-%m-%d')
+
+# 🔹 Filtrar solo los registros de base_cecos que NO estén ya en hsk
+base_cecos_nuevos = base_cecos[~base_cecos['llave'].isin(hsk['llave'])]
+
+# 🔹 Concatenar hsk con los nuevos (sin duplicar los reales)
+hsk = pd.concat([hsk, base_cecos_nuevos], ignore_index=True)
+
+# 🔹 Ordenar y limpiar
+hsk = hsk.sort_values('Fecha de tabulador').reset_index(drop=True)
+hsk.drop(columns=['llave'], inplace=True)
+base_cecos.drop(columns=['llave'], inplace=True)
+
+# Obtén la primera aparición de 'Tipo' para cada 'CeCo'
+Ola_hsk = hsk.groupby('CeCo')['Tipo'].first()
+
+# Crea la columna 'validacion' usando el mapeo
+hsk['validacion'] = hsk['CeCo'].map(Ola_hsk)
+
+# Crea las columnas Mes, Año y Año_LY
+hsk['Mes'] = hsk['Fecha de tabulador'].dt.month.astype(str)
+hsk['Año'] = hsk['Fecha de tabulador'].dt.year.astype(str)
+hsk['Año_LY'] = (hsk['Fecha de tabulador'].dt.year - 1).astype(str)
+hsk['Fecha'] = hsk['Fecha de tabulador']
+hsk['Fecha LY'] = hsk['Fecha'] - pd.DateOffset(years=1)
+
+# %% [markdown]
+# ## Ola 3 WE
+
+# %%
+# Convierte la columna a datetime por si acaso
+hsk['Fecha de tabulador'] = pd.to_datetime(hsk['Fecha de tabulador'])
+
+# Define la fecha de corte
+fecha_corte = pd.Timestamp('2025-06-01')
+
+# Filtro para Región WE y Año 2025 y Fecha de tabulador >= 1/6/2025
+filtro_we_ola3 = (
+    (hsk['Fecha de tabulador'] >= fecha_corte) &
+    (hsk['Año'] == '2025') &
+    (hsk['Región'] == 'WE')
+)
+
+# Para esas filas, asigna la primera aparición de Fecha de tabulador a partir de 1/6/2025 para cada CeCo
+primer_fecha_ola3 = (
+    hsk.loc[filtro_we_ola3]
+    .groupby('CeCo')['Fecha de tabulador']
+    .first()
+)
+
+# Asigna el resultado solo a las filas que cumplen el filtro
+hsk.loc[filtro_we_ola3, 'Fecha de ingreso a HSK'] = hsk.loc[filtro_we_ola3, 'CeCo'].map(primer_fecha_ola3)
+
+# 🔹 Nuevo paso: actualizar Tipo a "OLA3" para esas filas
+hsk.loc[filtro_we_ola3, 'validacion'] = "OLA3"
+
+hsk['Wave'] = hsk['validacion']
+
+# %% [markdown]
+# ## Da formato a las columnas que utilizaremos
+
+# %%
+# Normaliza tipos en hsk
+hsk['Año'] = hsk['Año'].astype(int).astype(str)
+hsk['Mes'] = hsk['Mes'].astype(int).astype(str)
+hsk['CeCo'] = hsk['CeCo'].astype(str)
+hsk['# SK'] = hsk['# SK'].astype(str)
+
+# Llaves y concatenaciones en hsk
+hsk['concat_ay'] = hsk['CeCo'] + hsk['Mes'] + hsk['Año']
+hsk['concat_ly'] = hsk['CeCo'] + hsk['Mes'] + (hsk['Año'].astype(int) - 1).astype(str)
+hsk['llave_proveedor_ay'] = hsk['# SK'] + hsk['Mes'] + hsk['Año']
+hsk['Nombre SK'] = hsk['Nombre SK'].astype(str)
+hsk['Nombre SK'] = hsk['Nombre SK'].astype(str)
+hsk['llave_proveedor_ly'] = hsk['# SK'] + hsk['Mes'] + (hsk['Año'].astype(int) - 1).astype(str)
+
+# Normaliza tipos en acumulado_bajas
+acumulado_bajas['Año'] = acumulado_bajas['Año'].astype(int).astype(str)
+acumulado_bajas['Mes'] = acumulado_bajas['Mes'].astype(int).astype(str)
+acumulado_bajas['NUMERO DE NEGOCIO'] = acumulado_bajas['NUMERO DE NEGOCIO'].astype(str)
+acumulado_bajas['NUMERO DE PROVEEDOR'] = acumulado_bajas['NUMERO DE PROVEEDOR'].astype(str)
+
+# Llaves y concatenaciones en acumulado_bajas
+acumulado_bajas['concat_ay'] = acumulado_bajas['NUMERO DE NEGOCIO'] + acumulado_bajas['Mes'] + acumulado_bajas['Año']
+acumulado_bajas['concat_ly'] = acumulado_bajas['NUMERO DE NEGOCIO'] + acumulado_bajas['Mes'] + (acumulado_bajas['Año'].astype(int) - 1).astype(str)
+acumulado_bajas['llave_proveedor_ay'] = acumulado_bajas['NUMERO DE PROVEEDOR'] + acumulado_bajas['Mes'] + acumulado_bajas['Año']
+acumulado_bajas['llave_proveedor_ly'] = acumulado_bajas['NUMERO DE PROVEEDOR'] + acumulado_bajas['Mes'] + (acumulado_bajas['Año'].astype(int) - 1).astype(str)
+
+# Función de asignación de bajas
+def agregar_bajas_a_hsk(hsk_df, bajas_df):
+    conteo_ay = bajas_df['llave_proveedor_ay'].value_counts()
+    conteo_ly = bajas_df['concat_ay'].value_counts()
+    
+    hsk_df['baja'] = hsk_df['llave_proveedor_ay'].map(conteo_ay).fillna(0).astype(int)
+    hsk_df['baja ly'] = hsk_df['concat_ly'].map(conteo_ly).fillna(0).astype(int)
+    
+    return hsk_df
+
+# Uso
+hsk = agregar_bajas_a_hsk(hsk, acumulado_bajas)
+
+# Crear diccionario de mapeo a partir de com_contrato
+# Asegurar que las llaves del mapeo sean texto
+map_dict = dict(zip(com_contrato['No.deNegocio'].astype(str), com_contrato['Tabulador 2025']))
+
+# Asegurar que la columna CeCo sea texto antes de mapear
+hsk['tradicional'] = hsk['CeCo'].astype(str).map(map_dict)
+
+# %% [markdown]
+# # Graduados
+
+# %%
+# Para contar aparición acumulada de cada CeCo (1ª, 2ª, 3ª, etc.)
+hsk['Aparicion'] = hsk.groupby('CeCo').cumcount() + 1
+
+# También calculamos el número máximo de apariciones por CeCo
+max_apariciones = hsk.groupby('CeCo')['Aparicion'].transform('max')
+
+# Reemplazamos el número de la última aparición por "Última"
+hsk['Aparicion'] = hsk.apply(
+    lambda row: 99999999 if row['Aparicion'] == max_apariciones[row.name] else row['Aparicion'],
+    axis=1
+)
+
+hsk['Status'] = "Activa"
+
+hsk['CeCo_count'] = hsk.groupby('CeCo')['CeCo'].transform('count')
+hsk = hsk.sort_values('Fecha de tabulador')
+
+
+def fill_pct_nuevo(group):
+    mask = (group['Etapa'] == 'HSK Activo')
+    # Solo para "HSK Activo", rellena hacia adelante (bfill)
+    group.loc[mask, '% Nuevo'] = group.loc[mask, '% Nuevo'].bfill()
+    return group
+
+hsk = hsk.sort_values(['CeCo', 'Fecha de tabulador'])
+hsk = hsk.groupby('CeCo', group_keys=False).apply(fill_pct_nuevo)
+
+# Filtra el DataFrame para CeCo == '301372092' y muestra el resultado
+# filtro = hsk[hsk['CeCo'] == '301372092']
+# print(filtro)
+# filtro.to_excel('aver.xlsx')
+
+
+# %%
+# Elimina duplicados en la columna 'Llave' y muestra cuántas filas se borraron
+original_count = len(op_historico)
+op_historico_sin_duplicados = op_historico.drop_duplicates(subset='Llave', keep='first')
+final_count = len(op_historico_sin_duplicados)
+print(f"Filas eliminadas por duplicados en 'Llave': {original_count - final_count}")
+
+# %%
+# Lookup para Sellout actual
+hsk['Sellout'] = hsk['concat_ay'].map(
+    op_historico_sin_duplicados.set_index('Llave')['Volumen Sell In (Hlts)']
+)
+
+# Lookup para Sellout ly
+hsk['sellout ly'] = hsk['concat_ly'].map(
+    op_historico_sin_duplicados.set_index('Llave')['Volumen Sell In (Hlts)']
+)
+# Lookup para Sellout actual
+hsk['op'] = hsk['concat_ay'].map(
+    op_historico_sin_duplicados.set_index('Llave')['EBIT']
+)
+
+# Lookup para Sellout ly
+hsk['op ly'] = hsk['concat_ly'].map(
+    op_historico_sin_duplicados.set_index('Llave')['EBIT']
+)
+
+
+# %%
+
+# Normaliza tipos en acumulado_bajas
+final_de_comisiones['Año_Comision'] = final_de_comisiones['Año_Comision'].astype(int).astype(str)
+final_de_comisiones['Mes'] = final_de_comisiones['Mes'].astype(int).astype(str)
+final_de_comisiones['No.SAPDENEGOCIO'] = final_de_comisiones['No.SAPDENEGOCIO'].astype(str)
+final_de_comisiones['NoDEPROVEEDOR'] = final_de_comisiones['NoDEPROVEEDOR'].astype(str)
+final_de_comisiones['Llave'] = final_de_comisiones['No.SAPDENEGOCIO'] + final_de_comisiones['NoDEPROVEEDOR'] + final_de_comisiones['Mes'] + final_de_comisiones['Año_Comision']
+final_de_comisiones['Llave2'] = final_de_comisiones['No.SAPDENEGOCIO'] + final_de_comisiones['Mes'] + final_de_comisiones['Año_Comision']
+
+hsk['Llave_Full'] = hsk['CeCo'] + hsk['Mes'] + hsk['Año']
+hsk['Llave_Full_ly'] = hsk['CeCo'] + hsk['Mes'] + (hsk['Año'].astype(int) - 1).astype(str)
+
+#lookup para Sellout actual
+lookup = final_de_comisiones.groupby('Llave2')['Total Income'].max()
+hsk['comision'] = hsk['Llave_Full'].map(lookup)
+hsk['comision ly'] = hsk['Llave_Full_ly'].map(lookup)
+
+hsk['Etapa']  = hsk['Etapa'].fillna('HSK Activo')
+
+# Exporta
+
+hsk.to_excel(r"C:\Users\dominh05\Documents\SIX\HSK\Resultados 2025\Historico Resultados HSK nuevo caliz.xlsx", index=False)
+hsk.to_parquet(r"C:\Users\dominh05\Documents\SIX\HSK\Resultados 2025\hsk historico nuevo.parquet", index=False)
+
+# Filtra las filas de final_de_comisiones donde 'Llave' está duplicado
+#duplicados = final_de_comisiones[final_de_comisiones.duplicated(subset='Llave', keep=False)]
+
+# Exporta los duplicados a Excel
+#duplicados.to_excel(r"C:\Users\dominh05\Documents\SIX\HSK\Resultados 2025\Llaves_duplicadas_final_de_comisiones.xlsx", index=False)
+
+
+
