@@ -1,0 +1,189 @@
+import pandas as pd
+Planta_Nominas = pd.read_excel(r"C:\Users\VELASV01\OneDrive\Documents\Planta Nomina\planta nomina 6 oct.XLSX")
+#Planta_Nominas = pd.read_excel(r"C:\Users\dominh05\Documents\Planta Nominas 2025\Planta nomina 2 de junio.xlsx")
+Tabla_subdiv_tabulador = pd.read_excel(r"C:\Users\VELASV01\OneDrive\Documents\Planta Nomina\Tabuladores SIX.xlsx", sheet_name= 'Subdivision Tabulador')
+Tabuladores = pd.read_excel(r"C:\Users\VELASV01\OneDrive\Documents\Planta Nomina\Tabuladores SIX.xlsx", sheet_name= 'Tabuladores')
+ 
+Planta_Nominas['concat'] = (
+    Planta_Nominas['Nº pers.'].astype(str) + '_' +
+    Planta_Nominas['Posición'].astype(str) + '_' +
+    Planta_Nominas['CC-nómina'].astype(str) + '_' +
+    Planta_Nominas['Sueldo diario/mensual'].astype(str)
+)
+ 
+# Eliminar duplicados basados en la columna concatenada
+Planta_Nominas = Planta_Nominas.drop_duplicates(subset=['concat'])
+#agrega la columna con el count del num de empleado
+Planta_Nominas['count_Nº_pers'] = Planta_Nominas.groupby('Nº pers.')['Nº pers.'].transform('count')
+ 
+#quita inactivos, jubilados y posiciones 999999
+Planta_Nominas = Planta_Nominas[(Planta_Nominas['Status ocupación'] != 'Dado de baja') & (Planta_Nominas['Status ocupación'] != 'Pensionista') & (Planta_Nominas['Posición'] != 99999999)]
+#Sueldos fijos, multiplica sueldo sind x 30
+Sueldo_fijo = Planta_Nominas[(Planta_Nominas['CC-nómina.1'] == 'Sueldo Ordinario Empleado') | (Planta_Nominas['CC-nómina.1'] == 'Sueldo Ordinario Sindical') | (Planta_Nominas['CC-nómina.1'] == 'Sueldo catorcenal Emplead') | (Planta_Nominas['CC-nómina.1'] == 'Sueldo catorcenal Sindica')]
+Sueldo_fijo.loc[(Sueldo_fijo['CC-nómina.1'] == 'Sueldo Ordinario Sindical') | (Sueldo_fijo['CC-nómina.1'] == 'Sueldo catorcenal Sindica'), 'Sueldo diario/mensual'] *= 30
+Sueldo_fijo_duplicados = Sueldo_fijo[Sueldo_fijo.duplicated()]
+#Sueldo_fijo_duplicados.to_excel('duplicados.xlsx')
+Sueldo_fijo = Sueldo_fijo.drop_duplicates()
+#Lo mismo para la BV
+Salario_de_Variable = Planta_Nominas[(Planta_Nominas['CC-nómina.1'] == 'Base Variable') | (Planta_Nominas['CC-nómina.1'] == 'Base Variable Diaria')]
+Salario_de_Variable .loc[Salario_de_Variable ['CC-nómina.1'] == 'Base Variable Diaria', 'Sueldo diario/mensual'] *= 30
+#Comisiones
+Salario_de_Comisión = Planta_Nominas[(Planta_Nominas['CC-nómina.1'] == 'Comision Fija Empleado') | (Planta_Nominas['CC-nómina.1'] == 'Comisión Fija Sindicaliza') | (Planta_Nominas['CC-nómina.1'] == 'Comision Garantia')]
+Salario_de_Comisión .loc[Salario_de_Comisión['CC-nómina.1'] == 'Comisión Fija Sindicaliza', 'Sueldo diario/mensual'] *= 30
+Salario_de_Comisión.loc[(Planta_Nominas['CC-nómina.1'] == 'Comision Garantia') & Salario_de_Comisión['Descripción Área de personal'].str.startswith('Sindi'), 'Sueldo diario/mensual'] *= 30
+# Obtener los valores únicos de la columna 'Salario_de_Comisión[Nº pers.]'
+comision_unique = Salario_de_Comisión['Nº pers.'].unique()
+# Obtener los valores únicos de la columna 'Salario_de_Variable[Nº pers.]'
+variable_unique = Salario_de_Variable['Nº pers.'].unique()
+# Combinar los valores únicos en una lista
+lista_unicos = list(set().union(comision_unique, variable_unique))
+#En la parte de salarios, le quito los que no estan en la lista
+sueldo_fijo_filtrado = Sueldo_fijo[Sueldo_fijo['Nº pers.'].isin(lista_unicos)]
+merged_df = pd.merge(sueldo_fijo_filtrado[['Nº pers.', 'Nombre de personal' , 'Sueldo diario/mensual', 'Posición.1', 'Ce.coste', 'SDvPer.','Gr.prof.']],
+                     Salario_de_Variable[['Nº pers.', 'Sueldo diario/mensual']],
+                     on='Nº pers.',
+                     how='outer',
+                     suffixes=('_sueldo_fijo', '_salario_variable'))
+merged_df = pd.merge(merged_df,
+                     Salario_de_Comisión[['Nº pers.', 'Sueldo diario/mensual']],
+                     on='Nº pers.',
+                     how='outer')
+merged_df = merged_df.fillna(0)
+merged_df = merged_df.rename(columns={'Sueldo diario/mensual_sueldo_fijo': 'Sueldo Mensual', 'Sueldo diario/mensual_salario_variable': 'Base Variable', 'Sueldo diario/mensual': 'Comisión Fija'})
+merged_df['Salario Total'] = (merged_df['Sueldo Mensual'] + merged_df['Base Variable'] + merged_df['Comisión Fija']).round(2)
+merged_df['Ponderación Sueldo'] = merged_df['Sueldo Mensual'] / merged_df['Salario Total']
+merged_df['Ponderación Base Variable'] = merged_df['Base Variable'] / merged_df['Salario Total']
+merged_df['Ponderación Comisión'] = merged_df['Comisión Fija'] / merged_df['Salario Total']
+merged_df['Validación'] = merged_df['Ponderación Sueldo'] + merged_df['Ponderación Base Variable'] + merged_df['Ponderación Comisión']
+merged_df['Validación'] = merged_df['Validación'].astype(float)
+merged_df['Validación'] = merged_df['Validación'].round(3)
+merged_df['Budget'] = merged_df['Salario Total'] * 0.3
+merged_df['Dif'] = merged_df['Budget'] - (merged_df['Base Variable'] + merged_df['Comisión Fija'])
+New_order = ['Nº pers.', 'Nombre de personal', 'Salario Total', 'Sueldo Mensual', 'Base Variable', 'Comisión Fija', 'Ponderación Sueldo', 'Ponderación Base Variable', 'Ponderación Comisión', 'Posición.1', 'Budget', 'Dif','Ce.coste','Validación', 'SDvPer.','Gr.prof.']
+merged_df = merged_df[New_order]
+#Formato a las celdas de ponderación
+merged_df['Ponderación Sueldo'] = merged_df['Ponderación Sueldo'].round(1)
+merged_df['Ponderación Base Variable'] = merged_df['Ponderación Base Variable'].round(1)
+merged_df['Ponderación Comisión'] = merged_df['Ponderación Comisión'].round(1)
+merged_df = merged_df.drop_duplicates()
+ 
+#filtra para conservar solo SIX
+merged_df_six = merged_df[merged_df['SDvPer.'].astype(str).str.endswith('S')].copy()
+ 
+#lookup del tabulador segun la subdivisión
+dict_subdiv_tab = dict(zip(Tabla_subdiv_tabulador['SDvPer.'], Tabla_subdiv_tabulador['Tabulador']))
+merged_df_six['Tabulador'] = merged_df['SDvPer.'].map(dict_subdiv_tab)
+ 
+merged_df_six['JG'] = ''
+ 
+def obtener_JG(gr_prof):
+    if gr_prof == 'NIVEL 01':
+        return 1
+    elif gr_prof == 'NIVEL 02':
+        return 2
+    elif gr_prof == 'NIVEL 03':
+        return 3
+    elif gr_prof == 'NIVEL 04':
+        return 4
+    elif gr_prof == 'NIVEL 05':
+        return 5
+    elif gr_prof == 'NIVEL 06':
+        return 6
+    elif gr_prof == 'NIVEL 07':
+        return 7
+    elif gr_prof == 'NIVEL 08':
+        return 8
+    elif gr_prof == 'NIVEL 09':
+        return 9
+    elif gr_prof == 'NIVEL 10':
+        return 10
+    elif gr_prof == 'NIVEL 11':
+        return 11
+    elif gr_prof == 'NIVEL 12':
+        return 12
+    elif gr_prof == 'NIVEL 13':
+        return 13
+    elif gr_prof == 'NIVEL 15':
+        return 15
+    else:
+        return None
+ 
+merged_df_six['JG Local'] = merged_df_six['Gr.prof.'].apply(obtener_JG)
+dict_jb_global = {
+    4: 1,
+    5: 2,
+    6: 3,
+    7: 4,
+    8: 5,
+    9: 6,
+    10: 7,
+    11: 8,
+    12: 9,
+    13: 10,
+    15: 15,
+    20: 20
+}        
+ 
+merged_df_six['JG'] = merged_df_six['JG Local'].map(dict_jb_global)
+ 
+# ...existing code...
+# Asegura que JG sea numérico en ambos DataFrames
+merged_df_six['JG'] = pd.to_numeric(merged_df_six['JG'], errors='coerce')
+Tabuladores['JG'] = pd.to_numeric(Tabuladores['JG'], errors='coerce')
+ 
+def validar_tabulador(row):
+    tab = row['Tabulador']
+    JG = row['JG']
+    salario = row['Salario Total']
+    tab_rows = Tabuladores[Tabuladores['PayRange'] == tab]
+    JG_rows = tab_rows[tab_rows['JG'] <= JG]
+    if JG_rows.empty:
+        return pd.Series(['No JG válido en tabulador', None, None])
+    JG_row = JG_rows.sort_values('JG', ascending=False).iloc[0]
+    min_val = JG_row['MINIMO (78%)']
+    max_val = JG_row['MAXIMO (133%)']
+    if salario < min_val:
+        resultado = f'Salario menor al mínimo ({min_val})'
+    elif salario > max_val:
+        resultado = f'Salario mayor al máximo ({max_val})'
+    else:
+        resultado = ''
+    return pd.Series([resultado, min_val, max_val])
+ 
+merged_df_six[['Validación tabulador', 'Min Tabulador', 'Max Tabulador']] = merged_df_six.apply(validar_tabulador, axis=1)
+ 
+ 
+mix_70_30 = {
+    "Atraccion SIX": 0.70,
+    "Jefatura Operaciones SIX": 0.70,
+    "Especialista Expansion SIX": 0.70,
+    "Jefatura Operaciones SIX Indirectos": 0.70,
+    "Conquista SIX Indirectos": 0.70,
+    "TemVol Atraccion SIX": 0.70,
+    "TemInc Atraccion SIX": 0.70
+}
+        
+ 
+ mix_60_40: []
+ 
+ def validacion_mix (row):   
+     if 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+merged_df_six.to_excel('Planta Nomina Trabajado hoy_SIX.xlsx', index =False)
+ 
+ 
+ 
+#Validación
+if merged_df['Validación'].mean() != 1:
+    Socios_Con_Detalles = merged_df['Validación'] != 1
+    Lista_SCD = Socios_Con_Detalles['Nº pers.'].unique()
+    Reporte_SCD = Planta_Nominas[Planta_Nominas['Nº pers.'].isin(Lista_SCD)]
+    Reporte_SCD.to_excel('Socios con detalles.xlsx')
+else:
+    print('Terminado')
