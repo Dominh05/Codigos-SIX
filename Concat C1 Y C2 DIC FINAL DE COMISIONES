@@ -1,0 +1,147 @@
+import pandas as pd
+
+comQ1 = pd.read_excel('CÁLCULO DE COMISIÓN DIC C1 22_VFVale 2022.xlsx')
+comQ2 = pd.read_excel('CÁLCULO DE COMISIÓN Dic C2 22_VF 2022.xlsx')
+comQ1 = comQ1.fillna(0)
+comQ2 = comQ2.fillna(0)
+# Crear el DataFrame 'Negocios_Q2' con los registros de 'comQ2' que no están en 'comQ1'
+Negocios_Q2 = comQ2[~comQ2[['No.SAPDENEGOCIO', 'NoDEPROVEEDOR']].apply(tuple, axis=1).isin(
+    comQ1[['No.SAPDENEGOCIO', 'NoDEPROVEEDOR']].apply(tuple, axis=1))]
+
+# Ahora 'Negocios_Q2' contiene los registros únicos de comQ2 que no están en comQ1
+
+# Actualizar 'comQ2' para quitar las filas que ya están en 'Negocios_Q2'
+comQ2 = comQ2[~comQ2[['No.SAPDENEGOCIO', 'NoDEPROVEEDOR']].apply(tuple, axis=1).isin(
+    Negocios_Q2[['No.SAPDENEGOCIO', 'NoDEPROVEEDOR']].apply(tuple, axis=1))]
+
+# Ahora 'comQ2' contiene solo las filas que no están en 'Negocios_Q2'
+
+#creo una lista de como estaba el df al inicio para reordenar el df resultante de este codigo
+orden_columnas_comQ1 = comQ1.columns.tolist()
+
+
+#las columnas que quiero sumar
+lista_col_a_sumar = [
+    "VENTA CERVEZA",
+    "MONTO GARANTIZADO",
+    "COMISIÓN VARIABLE",
+    "COMPLEMENTO DE COMISION FIJA/VARIABLE",
+    "CIGARROS",
+    "TAE",
+    "PAGO RTD'S",
+    "STRONGBOW",
+    "SPIRITS",
+    "ENERGIZANTES",
+    "SUEROS ORALES",
+    "SIM CARDS",
+    "ENCENDEDORES",
+    "CANIJILLA",
+    "ARTICULOS SIX",
+    "FARMACIA G",
+    "FARMACIA M",
+    "AGUA",
+    "ENERGY DRINKS",
+    "SERVICIOS ELECTRONICOS",
+    "INCENTIVO CATEGORIAS DIRECTAS",
+    "INCENTIVO CATEGORIAS INDIRECTAS",
+    #"REDENCIONES LÁCTEOS",
+    #"REDENCIONES REFRESCOS",
+    #"REDENCIONES SNACK",
+    "REDENCIONES HELADOS",
+    "REDENCIONES CIGARROS",
+    "BONO DE BIENVENIDA",
+    "BONO CERVEZA",
+    "BONO EJECUCIÓN",
+    "INSTRUCTOR INDIRECTO",
+    "APOYO TEMPORAL COMODIN",
+    "INSTRUCTOR",
+    "GARANTIAS (G)",
+    "CIERRE TEMPORAL",
+    "GENTE COMO TU",
+    "INCENTIVO USO POS",
+    "INCENTIVO GLUP",
+    "APOYOS (VARIOS)",
+    "CONCEPTO APOYO (VARIOS)",
+    "ANTICIPOS",
+    "PERCEPCION",
+    "IVA",
+    "INGRESO BRUTO",
+    "IVA RET",
+    "IMPUESTOS FEDERALES",
+    "HONORARIOS CONTADOR",
+    "IMSS",
+    "TIMBRADO",
+    "RESICO",
+    "AJUSTE DE COMISIÓN",
+    "GARANTÍA CONTABLE",
+    "MULTAS",
+    "DESCUENTO ENE ELEC",
+    "PENALIZACIONES",
+    "HIELO",
+    "PRODUCTOS COMPLEMENTARIOS",
+    "PENSIÓN ALIMENTICIA",
+    "GARANTÍA",
+    "ANTICIPO",
+    "GASTOS FIJOS",
+    "KIT DE SEGURIDAD",
+    "USO POS",
+    "MULTA NO VENTA A MENORES",
+    "HIPOTECARIO",
+    "AJUSTE DE COMISIONES ANTERIORES",
+    "TOTAL DESCUENTOS",
+    "PAGO ",
+    "PROPUESTA DE PAGO",
+    "DIF",
+    "FALTANTE",
+    "BP+BR",
+    "Percepción Com DIC C1",
+    "MONTO A GARANTIZAR (PERCEPCION - MONTO A GARANTIZAR)",
+    "MONTO GARANTIZADO.1",
+    "Apoyo Anticipo",
+    "ACLARACIONES",
+    "COMPLEMENTO DE COMISION FIJA/VARIABLE.1",
+    "Otros",
+    "Total",
+]
+
+# extraemos las columnas de comQ1
+columnas_comQ1 = comQ1.columns.tolist()
+# Filtramos las columnas que no están en lista_col_a_sumar
+columnas_no_en_lista_col_a_sumar = [col for col in columnas_comQ1 if col not in lista_col_a_sumar]
+# Crear un nuevo DataFrame con las columnas no en lista_col_a_sumar de comQ1
+df1 = comQ1[columnas_no_en_lista_col_a_sumar]
+
+comQ1 = comQ1.fillna(0)
+comQ2 = comQ2.fillna(0)
+
+
+concatq1yq2 = pd.concat([comQ1, comQ2], ignore_index=True)
+
+# Intentar convertir las columnas a tipo numérico y detectar cuáles generan NaN
+columnas_problematicas = []
+
+for col in lista_col_a_sumar:
+    # Convertir a numérico y contar NaN generados
+    nan_count = pd.to_numeric(concatq1yq2[col], errors='coerce').isna().sum()
+    if nan_count > 0:
+        columnas_problematicas.append(col)
+
+print("Columnas con valores no numéricos:", columnas_problematicas)
+
+df_pivot = concatq1yq2.pivot_table(
+    index=['No.SAPDENEGOCIO', 'NoDEPROVEEDOR'],  # Los índices
+    values=lista_col_a_sumar,  # Las columnas a sumar
+    aggfunc='sum',  # La función agregadora, en este caso 'sum'
+    fill_value=0  # Reemplazar NaN por 0
+)
+# Convertir los índices en columnas
+df_pivot_reset = df_pivot.reset_index()
+
+# Ahora realizar la concatenación correctamente
+df_resultado = pd.concat([Negocios_Q2, df_pivot_reset], ignore_index=True)
+
+# Ver el resultado
+df_resultado.tail()
+print(df_resultado['COMISIÓN VARIABLE'].sum())
+# Guardamos el DataFrame concatenado en un archivo Excel
+df_resultado.to_excel('resultado_concatenado_dic_2022.xlsx', index=False)
